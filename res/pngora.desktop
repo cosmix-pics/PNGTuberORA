@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PNGTuberORA
+Comment=PNG-tuber software using open raster format
+Exec=PNGTuberORA
+Icon=pngora
+Terminal=false
+Categories=Graphics;AudioVideo;
+StartupNotify=false
