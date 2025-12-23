@@ -42,27 +42,12 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
     #include <X11/keysym.h>
     #include <stdbool.h>
     
-    // Note: Linux implementation for arbitrary VK mapping is complex without a map.
-    // For now, we assume simple mapping isn't fully supported or requires scancode conversion.
-    // This returns 0 as placeholder or needs a proper implementation matching the config vk codes.
     int GetConfiguredHotkey(const int* keyBindings, int count) {
-        // TODO: Implement proper key mapping for Linux if needed
+        // TODO: Implement key mapping for Linux
         (void)keyBindings;
         (void)count;
         return 0;
     }
-
-#elif defined(__APPLE__)
-    #include <Carbon/Carbon.h>
-    #include <CoreGraphics/CoreGraphics.h>
-
-    int GetConfiguredHotkey(const int* keyBindings, int count) {
-        // TODO: Implement proper key mapping for macOS if needed
-        (void)keyBindings;
-        (void)count;
-        return 0; 
-    }
-
 #else
     int GetConfiguredHotkey(const int* keyBindings, int count) { (void)keyBindings; (void)count; return 0; }
 #endif
