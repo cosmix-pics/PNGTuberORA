@@ -5,6 +5,9 @@ this needs raylib.a inside a lib folder. see [raylib builds](https://github.com/
 
 to bootstrab the build system do `cc nob.c -o nob` then call `nob` and it should build
 
+the ORA file can be made in gimp or krita.
+
+by naming the layers specific things it will change there behavior in the program
 
 ## layers cheat sheet
 * hidden layers wont show up in rendering
