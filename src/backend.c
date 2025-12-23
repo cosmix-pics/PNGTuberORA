@@ -41,11 +41,68 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
     #include <X11/Xlib.h>
     #include <X11/keysym.h>
     #include <stdbool.h>
-    
+
+    static Display* x11Display = NULL;
+    static bool x11Initialized = false;
+    static char prevKeyState[32] = {0};
+
+    // Convert Windows VK code / ASCII to X11 KeySym
+    static KeySym VKToKeySym(int vk) {
+        // VK Letters and numbers are just ACSII
+        if (vk >= 'A' && vk <= 'Z') {
+            // Lowercase, because of course X11 has separate keycodes for both
+            return XK_a + (vk - 'A');
+        }
+        if (vk >= '0' && vk <= '9') {
+            return XK_0 + (vk - '0');
+        }
+        // Numpad 0-9 (Windows VK: 0x60-0x69)
+        if (vk >= 0x60 && vk <= 0x69) {
+            return XK_KP_0 + (vk - 0x60);
+        }
+        // Function keys F1-F24 (Windows VK: 0x70-0x87)
+        // X11 goes up to F35, but Windows stops at F24
+        if (vk >= 0x70 && vk <= 0x87) {
+            return XK_F1 + (vk - 0x70);
+        }
+        return NoSymbol;
+    }
+
     int GetConfiguredHotkey(const int* keyBindings, int count) {
-        // TODO: Implement key mapping for Linux
-        (void)keyBindings;
-        (void)count;
+        // Lazy initialization of X11 display
+        if (!x11Initialized) {
+            x11Display = XOpenDisplay(NULL);
+            x11Initialized = true;
+        }
+        if (!x11Display) return 0;
+
+        char keyState[32];
+        XQueryKeymap(x11Display, keyState);
+
+        for (int i = 0; i < count; i++) {
+            if (keyBindings[i] <= 0) continue;
+
+            KeySym keysym = VKToKeySym(keyBindings[i]);
+            if (keysym == NoSymbol) continue;
+
+            KeyCode keycode = XKeysymToKeycode(x11Display, keysym);
+            if (keycode == 0) continue;
+
+            // Key presses are stored in a bitmap
+            int byteIndex = keycode / 8;
+            int bitIndex = keycode % 8;
+
+            bool isPressed = (keyState[byteIndex] & (1 << bitIndex)) != 0;
+            bool wasPressed = (prevKeyState[byteIndex] & (1 << bitIndex)) != 0;
+
+            // X only seems to track the current state, so save it for the next loop
+            if (isPressed && !wasPressed) {
+                memcpy(prevKeyState, keyState, sizeof(prevKeyState));
+                return i + 1;
+            }
+        }
+
+        memcpy(prevKeyState, keyState, sizeof(prevKeyState));
         return 0;
     }
 #else
@@ -83,6 +140,12 @@ void InitBackend(void) {
 }
 void CloseBackend(void) {
     ma_device_uninit(&device);
+#if defined(__linux__)
+    if (x11Display) {
+        XCloseDisplay(x11Display);
+        x11Display = NULL;
+    }
+#endif
 }
 float GetMicrophoneVolume(void) {
     float vol = currentVolume * 5.0f; 
