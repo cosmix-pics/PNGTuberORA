@@ -110,11 +110,9 @@ int main(int argc, char **argv)
         BeginDrawing();
             ClearBackground(BLANK);
 
-            BeginBlendMode(BLEND_ALPHA); 
-            rlDisableDepthMask();
-            rlDisableDepthTest();
-
             if (myAvatar.isLoaded) {
+                rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA, RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+                BeginBlendMode(BLEND_CUSTOM_SEPARATE);
                 for (int i = myAvatar.layerCount - 1; i >= 0; i--) {
                     DrawLayer(&myAvatar.layers[i], 
                               currentBounce, 
@@ -123,6 +121,7 @@ int main(int argc, char **argv)
                               isTalking, 
                               myAvatar.isBlinking);
                 }
+                EndBlendMode();
             } else {
                 DrawRectangle(0,0, 500, 500, BLACK);
                 DrawText("Drop ORA File", 140, 240, 30, WHITE);
