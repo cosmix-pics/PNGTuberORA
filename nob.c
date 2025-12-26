@@ -6,12 +6,68 @@
 #define LINUXDEPLOY  BUILD_FOLDER "linuxdeploy-x86_64.AppImage"
 #define LINUXDEPLOY_URL "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
 
+#ifdef _WIN32
+#define RAYLIB_URL "https://github.com/raysan5/raylib/releases/download/5.0/raylib-5.0_win64_mingw-w64.zip"
+#define RAYLIB_DIR "raylib-5.0_win64_mingw-w64"
+#else
+#define RAYLIB_URL "https://github.com/raysan5/raylib/releases/download/5.0/raylib-5.0_linux_amd64.tar.gz"
+#define RAYLIB_DIR "raylib-5.0_linux_amd64"
+#endif
+
+bool download_raylib(void)
+{
+    #ifdef _WIN32
+    if (nob_file_exists("lib/libraylib.a")) return true;
+    #else
+    if (nob_file_exists("lib/linux/libraylib.a")) return true;
+    #endif
+
+    #ifdef _WIN32
+    if (!nob_mkdir_if_not_exists("lib")) return false;
+    #else
+    if (!nob_mkdir_if_not_exists("lib")) return false;
+    if (!nob_mkdir_if_not_exists("lib/linux")) return false;
+    #endif
+
+    nob_log(NOB_INFO, "Downloading raylib from %s...", RAYLIB_URL);
+    Nob_Cmd cmd = {0};
+    nob_cmd_append(&cmd, "curl", "-L", "-o", "raylib.archive", RAYLIB_URL);
+    if (!nob_cmd_run(&cmd)) return false;
+
+    nob_log(NOB_INFO, "Extracting raylib...");
+    cmd.count = 0;
+    nob_cmd_append(&cmd, "tar", "-xf", "raylib.archive");
+    if (!nob_cmd_run(&cmd)) return false;
+
+    nob_log(NOB_INFO, "Installing raylib...");
+    #ifdef _WIN32
+    if (!nob_copy_file(RAYLIB_DIR "/lib/libraylib.a", "lib/libraylib.a")) return false;
+    #else
+    if (!nob_copy_file(RAYLIB_DIR "/lib/libraylib.a", "lib/linux/libraylib.a")) return false;
+    #endif
+
+    nob_log(NOB_INFO, "Cleaning up...");
+    nob_delete_file("raylib.archive");
+    
+    cmd.count = 0;
+    #ifdef _WIN32
+    nob_cmd_append(&cmd, "cmd", "/c", "rmdir", "/s", "/q", RAYLIB_DIR);
+    #else
+    nob_cmd_append(&cmd, "rm", "-rf", RAYLIB_DIR);
+    #endif
+    if (!nob_cmd_run(&cmd)) return false;
+
+    nob_cmd_free(cmd);
+    return true;
+}
+
 bool build(void)
 {
     if (!nob_mkdir_if_not_exists(BUILD_FOLDER)) return false;
 
     Nob_Cmd cmd = {0};
     #ifdef _WIN32
+        if (!download_raylib()) return false;
         const char *icon_rc = "101 ICON \"res/pngora.ico\"";
         if (!nob_write_entire_file("icon.rc", icon_rc, strlen(icon_rc))) return false;
         nob_cmd_append(&cmd, "windres", "icon.rc", "-o", "icon.o");
@@ -21,6 +77,7 @@ bool build(void)
             "-lraylib", "-lgdi32", "-lwinmm", "-Iinc", "-Llib", "inc/miniz.c",
             "-o", BUILD_FOLDER "PNGTuberORA");
     #else
+        if (!download_raylib()) return false;
         nob_cmd_append(&cmd, "cc",
             SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c", SRC_FOLDER "viseme_trainer.c",
             "-lraylib", "-lGL", "-lm", "-lpthread", "-ldl", "-lrt", "-lX11", "-Iinc", "-Llib/linux", "inc/miniz.c",
