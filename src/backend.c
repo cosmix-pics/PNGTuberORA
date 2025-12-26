@@ -1,6 +1,7 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 #include "backend.h"
+#include "viseme_trainer.h"
 #include <stdio.h>
 #include <math.h>
 
@@ -11,6 +12,8 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
 {
     const float* pInputFloat = (const float*)pInput;
     if (pInputFloat == NULL) return;
+
+    VisemeProcess(pInputFloat, (int)frameCount);
 
     float sum = 0.0f;
     for (ma_uint32 i = 0; i < frameCount; i++) {
@@ -130,6 +133,7 @@ void InitBackend(void) {
     config.capture.format   = ma_format_f32;
     config.capture.channels = 1;
     config.sampleRate       = 44100;
+    config.periodSizeInFrames = 512;
     config.dataCallback     = data_callback;
 
     if (ma_device_init(NULL, &config, &device) != MA_SUCCESS) {

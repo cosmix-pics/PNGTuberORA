@@ -4,17 +4,24 @@
 #include "backend.h"
 #include "avatar.h"
 #include "config.h"
+#include "viseme_trainer.h"
 #include <string.h>
+#include <stdio.h>
 
-void DrawLayer(AvatarPart* p, float bounceY, float swayAngle, int currentCostume, bool isTalking, bool isBlinking) {
+void DrawLayer(AvatarPart* p, float bounceY, float swayAngle, int currentCostume, bool isTalking, bool isBlinking, AvatarPart* activeMouth) {
     if (!p->active) return;
     if (p->costumeId != 0 && p->costumeId != currentCostume) return;
 
     if ((p->type == LAYER_EYE_OPEN     &&  isBlinking)||
         (p->type == LAYER_EYE_CLOSED   && !isBlinking)||
-        (p->type == LAYER_MOUTH_OPEN   && !isTalking) ||
         (p->type == LAYER_MOUTH_CLOSED &&  isTalking) ){
         return;
+    }
+
+    if (p->type == LAYER_MOUTH_OPEN) {
+        if (!isTalking) return;
+        // specific active mouth decided by viseme, only draw that one
+        if (activeMouth && p != activeMouth) return;
     }
 
     if (p->hasPivot) {
@@ -40,6 +47,9 @@ int main(int argc, char **argv)
     const char* appDir = GetApplicationDirectory();
     char configPath[1024];
     strcpy(configPath, TextFormat("%s%s", appDir, "config.ini"));
+    
+    char visemePath[1024];
+    strcpy(visemePath, TextFormat("%s%s", appDir, "visime.dat"));
 
     AppConfig config = {0};
     if (!FileExists(configPath)) {
@@ -52,6 +62,18 @@ int main(int argc, char **argv)
     SetWindowIconID(GetWindowHandle(), 101);
     SetTargetFPS(60);
     InitBackend();
+    VisemeInit();
+
+    bool isTrainingMode = false;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-visime") == 0) {
+            isTrainingMode = true;
+        }
+    }
+
+    if (VisemeLoad(visemePath)) {
+        printf("Loaded visemes from %s\n", visemePath);
+    }
 
     Avatar myAvatar = {0};
 
@@ -70,6 +92,16 @@ int main(int argc, char **argv)
     {
         int key = GetConfiguredHotkey(config.hotkeys, MAX_HOTKEYS);
         if (key > 0) myAvatar.currentCostume = key;
+
+        if (isTrainingMode) {
+            if (IsKeyDown(KEY_FOUR)) VisemeSetTraining(VIS_SLOT_AA);
+            else if (IsKeyDown(KEY_THREE)) VisemeSetTraining(VIS_SLOT_OU);
+            else if (IsKeyDown(KEY_TWO)) VisemeSetTraining(VIS_SLOT_CH);
+            else if (IsKeyDown(KEY_ONE)) VisemeSetTraining(VIS_SLOT_SILENCE);
+            else VisemeSetTraining(-1);
+
+            if (IsKeyPressed(KEY_ZERO)) VisemeSave(visemePath);
+        }
 
         if (IsFileDropped()) {
             FilePathList droppedFiles = LoadDroppedFiles();
@@ -107,6 +139,25 @@ int main(int argc, char **argv)
             currentSway = Lerp(currentSway, 0, 0.1f);
         }
 
+        AvatarPart* activeMouth = NULL;
+        if (isTalking && myAvatar.isLoaded) {
+            int bestSlot = VisemeGetBest();
+            AvatarPart* defaultMouth = NULL;
+            
+            for (int i = 0; i < myAvatar.layerCount; i++) {
+                AvatarPart* p = &myAvatar.layers[i];
+                if (p->type == LAYER_MOUTH_OPEN && p->active && (p->costumeId == 0 || p->costumeId == myAvatar.currentCostume)) {
+                    bool isSpecific = (strstr(p->name, "[aa]") || strstr(p->name, "[ou]") || strstr(p->name, "[ch]"));
+                    if (!isSpecific) defaultMouth = p;
+                    
+                    if (bestSlot == VIS_SLOT_AA && strstr(p->name, "[aa]")) activeMouth = p;
+                    else if (bestSlot == VIS_SLOT_OU && strstr(p->name, "[ou]")) activeMouth = p;
+                    else if (bestSlot == VIS_SLOT_CH && strstr(p->name, "[ch]")) activeMouth = p;
+                }
+            }
+            if (!activeMouth) activeMouth = defaultMouth;
+        }
+
         BeginDrawing();
             ClearBackground(BLANK);
 
@@ -119,17 +170,29 @@ int main(int argc, char **argv)
                               currentSway, 
                               myAvatar.currentCostume, 
                               isTalking, 
-                              myAvatar.isBlinking);
+                              myAvatar.isBlinking,
+                              activeMouth);
                 }
                 EndBlendMode();
             } else {
                 DrawRectangle(0,0, 500, 500, BLACK);
                 DrawText("Drop ORA File", 140, 240, 30, WHITE);
             }
+            
+            if (isTrainingMode) {
+                DrawText("VIS TRAINING MODE", 10, 10, 20, RED);
+                DrawText("1: Silence 2: CH 3: OU 4: AA 0: Save", 10, 30, 10, WHITE);
+                float* conf = VisemeGetConfidences();
+                for(int i=1; i<=4; i++) {
+                    DrawRectangle(10 + (i*30), 50, 20, (int)(conf[i]*100), GREEN);
+                    DrawText(TextFormat("%d", i), 10 + (i*30), 155, 10, WHITE);
+                }
+            }
         EndDrawing();
     }
 
     UnloadAvatar(&myAvatar);
+    VisemeShutdown();
     CloseBackend();
     CloseWindow();
     return 0;

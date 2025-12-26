@@ -17,12 +17,12 @@ bool build(void)
         nob_cmd_append(&cmd, "windres", "icon.rc", "-o", "icon.o");
         if (!nob_cmd_run(&cmd)) return false;
         nob_cmd_append(&cmd, "cc", "icon.o",
-            SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c",
+            SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c", SRC_FOLDER "viseme_trainer.c",
             "-lraylib", "-lgdi32", "-lwinmm", "-Iinc", "-Llib", "inc/miniz.c",
             "-o", BUILD_FOLDER "PNGTuberORA");
     #else
         nob_cmd_append(&cmd, "cc",
-            SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c",
+            SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c", SRC_FOLDER "viseme_trainer.c",
             "-lraylib", "-lGL", "-lm", "-lpthread", "-ldl", "-lrt", "-lX11", "-Iinc", "-Llib/linux", "inc/miniz.c",
             "-o", BUILD_FOLDER "PNGTuberORA");
     #endif
