@@ -1,8 +1,6 @@
 # PNGTuberORA
 simple png tuber software using open raster format
 
-this needs raylib.a (libraylib.a on linux) inside a lib folder. see [raylib builds](https://github.com/raysan5/raylib/releases)
-
 to bootstrab the build system do `cc nob.c -o nob` then call `nob` and it should build
 the executable would be in the build folder
 
