@@ -17,3 +17,8 @@ by naming the layers specific things it will change there behavior in the progra
 * another layer with `mouth` will be turned off during speaking
 * layers starting with `c` folowed by a number `1` to `9` and then `_` will be mapped to that respective costume, example `c3_hat`
 * pivot layers start with `pivot_` folowed by another layers name. this will be the pivot of that layer. this only cares about the left and top pixels, just use a single pixel as the pivot
+
+## visimes
+added suport for primitive visime's you can add `[AA]`, `[OU]` or `[CH]` to mouth open layers. see vis.ora for example.
+
+visimes need to be "trained" on your voice to do so start the program with the argument `-visime` use the numrow keys 1 to 4 to train the specific sound then it can be saved by pressing 0
