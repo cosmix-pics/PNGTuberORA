@@ -7,20 +7,24 @@
 #define LINUXDEPLOY_URL "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
 
 #ifdef _WIN32
-#define RAYLIB_URL "https://github.com/raysan5/raylib/releases/download/5.0/raylib-5.0_win64_mingw-w64.zip"
-#define RAYLIB_DIR "raylib-5.0_win64_mingw-w64"
+    #ifdef _MSC_VER
+        #define RAYLIB_URL "https://github.com/raysan5/raylib/releases/download/5.0/raylib-5.0_win64_msvc16.zip"
+        #define RAYLIB_DIR "raylib-5.0_win64_msvc16"
+        #define RAYLIB_LIB_PATH "lib/raylib.lib"
+    #else
+        #define RAYLIB_URL "https://github.com/raysan5/raylib/releases/download/5.0/raylib-5.0_win64_mingw-w64.zip"
+        #define RAYLIB_DIR "raylib-5.0_win64_mingw-w64"
+        #define RAYLIB_LIB_PATH "lib/libraylib.a"
+    #endif
 #else
-#define RAYLIB_URL "https://github.com/raysan5/raylib/releases/download/5.0/raylib-5.0_linux_amd64.tar.gz"
-#define RAYLIB_DIR "raylib-5.0_linux_amd64"
+    #define RAYLIB_URL "https://github.com/raysan5/raylib/releases/download/5.0/raylib-5.0_linux_amd64.tar.gz"
+    #define RAYLIB_DIR "raylib-5.0_linux_amd64"
+    #define RAYLIB_LIB_PATH "lib/linux/libraylib.a"
 #endif
 
 bool download_raylib(void)
 {
-    #ifdef _WIN32
-    if (nob_file_exists("lib/libraylib.a")) return true;
-    #else
-    if (nob_file_exists("lib/linux/libraylib.a")) return true;
-    #endif
+    if (nob_file_exists(RAYLIB_LIB_PATH)) return true;
 
     #ifdef _WIN32
     if (!nob_mkdir_if_not_exists("lib")) return false;
@@ -41,9 +45,13 @@ bool download_raylib(void)
 
     nob_log(NOB_INFO, "Installing raylib...");
     #ifdef _WIN32
-    if (!nob_copy_file(RAYLIB_DIR "/lib/libraylib.a", "lib/libraylib.a")) return false;
+        #ifdef _MSC_VER
+            if (!nob_copy_file(RAYLIB_DIR "/lib/raylib.lib", RAYLIB_LIB_PATH)) return false;
+        #else
+            if (!nob_copy_file(RAYLIB_DIR "/lib/libraylib.a", RAYLIB_LIB_PATH)) return false;
+        #endif
     #else
-    if (!nob_copy_file(RAYLIB_DIR "/lib/libraylib.a", "lib/linux/libraylib.a")) return false;
+        if (!nob_copy_file(RAYLIB_DIR "/lib/libraylib.a", RAYLIB_LIB_PATH)) return false;
     #endif
 
     nob_log(NOB_INFO, "Cleaning up...");
@@ -70,12 +78,24 @@ bool build(void)
         if (!download_raylib()) return false;
         const char *icon_rc = "101 ICON \"res/pngora.ico\"";
         if (!nob_write_entire_file("icon.rc", icon_rc, strlen(icon_rc))) return false;
-        nob_cmd_append(&cmd, "windres", "icon.rc", "-o", "icon.o");
-        if (!nob_cmd_run(&cmd)) return false;
-        nob_cmd_append(&cmd, "cc", "icon.o",
-            SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c", SRC_FOLDER "viseme_trainer.c",
-            "-lraylib", "-lgdi32", "-lwinmm", "-Iinc", "-Llib", "inc/miniz.c",
-            "-o", BUILD_FOLDER "PNGTuberORA");
+
+        #ifdef _MSC_VER
+            nob_cmd_append(&cmd, "rc", "/fo", "icon.res", "icon.rc");
+            if (!nob_cmd_run(&cmd)) return false;
+            
+            cmd.count = 0;
+            nob_cmd_append(&cmd, "cl", "/nologo", "/O2", "/W3", "/MD", "/Iinc");
+            nob_cmd_append(&cmd, SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c", SRC_FOLDER "viseme_trainer.c", "inc/miniz.c");
+            nob_cmd_append(&cmd, "/Fe" BUILD_FOLDER "PNGTuberORA.exe");
+            nob_cmd_append(&cmd, "/link", "/LIBPATH:lib", "raylib.lib", "User32.lib", "Gdi32.lib", "Shell32.lib", "Winmm.lib", "icon.res");
+        #else
+            nob_cmd_append(&cmd, "windres", "icon.rc", "-o", "icon.o");
+            if (!nob_cmd_run(&cmd)) return false;
+            nob_cmd_append(&cmd, "cc", "icon.o",
+                SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c", SRC_FOLDER "viseme_trainer.c",
+                "-lraylib", "-lgdi32", "-lwinmm", "-Iinc", "-Llib", "inc/miniz.c",
+                "-o", BUILD_FOLDER "PNGTuberORA");
+        #endif
     #else
         if (!download_raylib()) return false;
         nob_cmd_append(&cmd, "cc",
@@ -88,7 +108,11 @@ bool build(void)
 
     #ifdef _WIN32
         nob_delete_file("icon.rc");
-        nob_delete_file("icon.o");
+        #ifdef _MSC_VER
+            nob_delete_file("icon.res");
+        #else
+            nob_delete_file("icon.o");
+        #endif
     #endif
 
     return true;
