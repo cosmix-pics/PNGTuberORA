@@ -133,4 +133,8 @@ void LoadAvatarFromOra(const char* filepath, Avatar* avatar) {
     avatar->isLoaded = true;
     avatar->currentCostume = 1;
     printf("Avatar loaded successfully: %dx%d with %d layers.\n", avatar->width, avatar->height, avatar->layerCount);
+    
+    strncpy(avatar->filePath, filepath, 1023);
+    avatar->filePath[1023] = '\0';
+    avatar->lastModTime = GetFileModTime(filepath);
 }

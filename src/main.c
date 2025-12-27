@@ -20,7 +20,6 @@ void DrawLayer(AvatarPart* p, float bounceY, float swayAngle, int currentCostume
 
     if (p->type == LAYER_MOUTH_OPEN) {
         if (!isTalking) return;
-        // specific active mouth decided by viseme, only draw that one
         if (activeMouth && p != activeMouth) return;
     }
 
@@ -88,6 +87,8 @@ int main(int argc, char **argv)
 
     if (myAvatar.width > 0) SetWindowSize(myAvatar.width, myAvatar.height);
     
+    float reloadTimer = 0.0f;
+
     while (!WindowShouldClose())
     {
         int key = GetConfiguredHotkey(config.hotkeys, MAX_HOTKEYS);
@@ -115,6 +116,26 @@ int main(int argc, char **argv)
         float vol = GetMicrophoneVolume();
         bool isTalking = vol > 0.15f;
         float dt = GetFrameTime();
+
+        reloadTimer += dt;
+        if (reloadTimer >= 1.0f) {
+            reloadTimer = 0.0f;
+            if (myAvatar.isLoaded && FileExists(myAvatar.filePath)) {
+                long currentModTime = GetFileModTime(myAvatar.filePath);
+                if (currentModTime > myAvatar.lastModTime) {
+                    Avatar tempAvatar = {0};
+                    LoadAvatarFromOra(myAvatar.filePath, &tempAvatar);
+                    
+                    if (tempAvatar.isLoaded) {
+                        UnloadAvatar(&myAvatar);
+                        myAvatar = tempAvatar;
+                        if (myAvatar.width > 0) SetWindowSize(myAvatar.width, myAvatar.height);
+                    } else {
+                        UnloadAvatar(&tempAvatar);
+                    }
+                }
+            }
+        }
 
         myAvatar.nextBlinkTime -= dt;
         if (myAvatar.nextBlinkTime <= 0) {

@@ -37,6 +37,9 @@ typedef struct {
     float nextBlinkTime;
     bool isBlinking;
     bool isLoaded;
+
+    char filePath[1024];
+    long lastModTime;
 } Avatar;
 
 void LoadAvatarFromOra(const char* filepath, Avatar* avatar);
