@@ -25,6 +25,20 @@ static int ParseKeyName(const char* name) {
     return 0;
 }
 
+static const char* GetVKName(int vk) {
+    static char buf[4];
+    if ((vk >= '0' && vk <= '9') || (vk >= 'A' && vk <= 'Z')) {
+        buf[0] = (char)vk;
+        buf[1] = '\0';
+        return buf;
+    }
+    if (vk >= 0x70 && vk <= 0x7B) {
+        sprintf(buf, "F%d", vk - 0x70 + 1);
+        return buf;
+    }
+    return "0";
+}
+
 static void Trim(char* str) {
     char* p = str;
     int l = strlen(p);
@@ -34,14 +48,23 @@ static void Trim(char* str) {
 }
 
 void SaveDefaultConfig(const char* filename) {
+    AppConfig config = {0};
+    strcpy(config.defaultModelPath, "");
+    for (int i = 0; i < MAX_HOTKEYS; i++) config.hotkeys[i] = '1' + i;
+    config.voiceThreshold = 0.15f;
+    SaveConfig(filename, &config);
+}
+
+void SaveConfig(const char* filename, const AppConfig* config) {
     FILE* f = fopen(filename, "w");
     if (!f) return;
 
     fprintf(f, "# PNGTuber ORA Configuration\n");
-    fprintf(f, "default_model = \n");
+    fprintf(f, "default_model = %s\n", config->defaultModelPath);
+    fprintf(f, "voice_threshold = %.3f\n", config->voiceThreshold);
     fprintf(f, "\n# Hotkeys for costumes 1-9 (Format: A-Z, 0-9, F1-F12)\n");
     for (int i = 0; i < MAX_HOTKEYS; i++) {
-        fprintf(f, "costume_%d = %d\n", i + 1, i + 1);
+        fprintf(f, "costume_%d = %s\n", i + 1, GetVKName(config->hotkeys[i]));
     }
     fclose(f);
 }
@@ -51,6 +74,7 @@ void LoadConfig(const char* filename, AppConfig* config) {
     for (int i = 0; i < MAX_HOTKEYS; i++) {
         config->hotkeys[i] = '1' + i;
     }
+    config->voiceThreshold = 0.15f;
 
     FILE* f = fopen(filename, "r");
     if (!f) return;
@@ -73,6 +97,8 @@ void LoadConfig(const char* filename, AppConfig* config) {
 
         if (strcmp(key, "default_model") == 0) {
             strncpy(config->defaultModelPath, val, sizeof(config->defaultModelPath) - 1);
+        } else if (strcmp(key, "voice_threshold") == 0) {
+            config->voiceThreshold = (float)atof(val);
         } else if (strncmp(key, "costume_", 8) == 0) {
             int idx = atoi(key + 8) - 1;
             if (idx >= 0 && idx < MAX_HOTKEYS) {

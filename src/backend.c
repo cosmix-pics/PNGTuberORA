@@ -31,6 +31,11 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
 
 #ifdef _WIN32
     #include <windows.h>
+    #include <process.h>
+    #include <commdlg.h>
+    #include <stdint.h>
+    #include "config.h"
+
     int GetConfiguredHotkey(const int* keyBindings, int count) {
         for (int i = 0; i < count; i++) {
             if (keyBindings[i] > 0 && (GetAsyncKeyState(keyBindings[i]) & 1)) { 
@@ -40,10 +45,64 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
         return 0;
     }
 
+    #define IDM_SETTINGS 1
+    #define IDM_QUIT     2
+    #define IDM_TOGGLE_BORDER 3
+
+    int ShowContextMenu(void* windowHandle) {
+        HWND hwnd = (HWND)windowHandle;
+        HMENU hMenu = CreatePopupMenu();
+        
+        AppendMenu(hMenu, MF_STRING, IDM_SETTINGS, "Settings");
+        AppendMenu(hMenu, MF_STRING, IDM_TOGGLE_BORDER, "Toggle Border");
+        AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
+        AppendMenu(hMenu, MF_STRING, IDM_QUIT, "Quit");
+        
+        POINT pt;
+        GetCursorPos(&pt);
+        
+        SetForegroundWindow(hwnd);
+        
+        int selection = TrackPopupMenu(hMenu, 
+            TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON, 
+            pt.x, pt.y, 0, hwnd, NULL);
+            
+        DestroyMenu(hMenu);
+        return selection;
+    }
+
+    char* OpenFileDialog(void* windowHandle, const char* title, const char* filter) {
+        OPENFILENAME ofn = {0};
+        char szFile[512] = {0};
+        ofn.lStructSize = sizeof(ofn);
+        ofn.hwndOwner = (HWND)windowHandle;
+        ofn.lpstrFile = szFile;
+        ofn.nMaxFile = sizeof(szFile);
+        ofn.lpstrFilter = filter;
+        ofn.lpstrTitle = title;
+        ofn.nFilterIndex = 1;
+        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+        if (GetOpenFileName(&ofn)) {
+            char appDir[1024];
+            GetModuleFileName(NULL, appDir, sizeof(appDir));
+            char* lastSlash = strrchr(appDir, '\\');
+            if (lastSlash) *(lastSlash + 1) = '\0';
+            for (int i = 0; appDir[i]; i++) if (appDir[i] == '/') appDir[i] = '\\';
+            for (int i = 0; szFile[i]; i++) if (szFile[i] == '/') szFile[i] = '\\';
+            const char* finalPath = szFile;
+            size_t appDirLen = strlen(appDir);
+            if (_strnicmp(szFile, appDir, appDirLen) == 0) finalPath = szFile + appDirLen;
+            return _strdup(finalPath);
+        }
+        return NULL;
+    }
+
 #elif defined(__linux__)
     #include <X11/Xlib.h>
     #include <X11/keysym.h>
     #include <stdbool.h>
+    #include <stdlib.h> 
+    #include <string.h>
 
     static Display* x11Display = NULL;
     static bool x11Initialized = false;
@@ -108,14 +167,19 @@ void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uin
         memcpy(prevKeyState, keyState, sizeof(prevKeyState));
         return 0;
     }
+
+    int ShowContextMenu(void* windowHandle) { (void)windowHandle; return 0; }
+    char* OpenFileDialog(void* windowHandle, const char* title, const char* filter) { (void)windowHandle; (void)title; (void)filter; return NULL; }
 #else
     int GetConfiguredHotkey(const int* keyBindings, int count) { (void)keyBindings; (void)count; return 0; }
+    int ShowContextMenu(void* windowHandle) { (void)windowHandle; return 0; }
+    char* OpenFileDialog(void* windowHandle, const char* title, const char* filter) { (void)windowHandle; (void)title; (void)filter; return NULL; }
 #endif
 
 #ifdef _WIN32
 void SetWindowIconID(void* hwnd, int iconId) {
     HWND hWindow = (HWND)hwnd;
-    HICON hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(iconId)); 
+    HICON hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(101)); 
     if (hIcon) {
         SendMessage(hWindow, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
         SendMessage(hWindow, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);

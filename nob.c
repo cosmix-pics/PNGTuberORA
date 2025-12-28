@@ -85,22 +85,23 @@ bool build(void)
             
             cmd.count = 0;
             nob_cmd_append(&cmd, "cl", "/nologo", "/O2", "/W3", "/MD", "/Iinc");
-            nob_cmd_append(&cmd, SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c", SRC_FOLDER "viseme_trainer.c", "inc/miniz.c");
+            nob_cmd_append(&cmd, SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c", SRC_FOLDER "settings.c", SRC_FOLDER "viseme_trainer.c", "inc/miniz.c", "inc/tigr.c");
             nob_cmd_append(&cmd, "/Fe" BUILD_FOLDER "PNGTuberORA.exe");
-            nob_cmd_append(&cmd, "/link", "/LIBPATH:lib", "raylib.lib", "User32.lib", "Gdi32.lib", "Shell32.lib", "Winmm.lib", "icon.res");
+            nob_cmd_append(&cmd, "/link", "/LIBPATH:lib", "raylib.lib", "User32.lib", "Gdi32.lib", "Shell32.lib", "Winmm.lib", "Comdlg32.lib", "opengl32.lib", "icon.res");
         #else
             nob_cmd_append(&cmd, "windres", "icon.rc", "-o", "icon.o");
             if (!nob_cmd_run(&cmd)) return false;
             nob_cmd_append(&cmd, "cc", "icon.o",
-                SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c", SRC_FOLDER "viseme_trainer.c",
-                "-lraylib", "-lgdi32", "-lwinmm", "-Iinc", "-Llib", "inc/miniz.c",
+                SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c", SRC_FOLDER "settings.c", SRC_FOLDER "viseme_trainer.c",
+                "inc/miniz.c", "inc/tigr.c",
+                "-Iinc", "-Llib", "-lraylib", "-lgdi32", "-lwinmm", "-luser32", "-lcomdlg32", "-lopengl32", "-Wl,--allow-multiple-definition",
                 "-o", BUILD_FOLDER "PNGTuberORA");
         #endif
     #else
         if (!download_raylib()) return false;
         nob_cmd_append(&cmd, "cc",
-            SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c", SRC_FOLDER "viseme_trainer.c",
-            "-lraylib", "-lGL", "-lm", "-lpthread", "-ldl", "-lrt", "-lX11", "-Iinc", "-Llib/linux", "inc/miniz.c",
+            SRC_FOLDER "main.c", SRC_FOLDER "config.c", SRC_FOLDER "ora_loader.c", SRC_FOLDER "backend.c", SRC_FOLDER "settings.c", SRC_FOLDER "viseme_trainer.c",
+            "-lraylib", "-lGL", "-lm", "-lpthread", "-ldl", "-lrt", "-lX11", "-Iinc", "-Llib/linux", "inc/miniz.c", "inc/tigr.c",
             "-o", BUILD_FOLDER "PNGTuberORA");
     #endif
 

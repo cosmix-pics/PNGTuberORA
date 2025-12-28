@@ -2,11 +2,20 @@
 #include "raymath.h"
 #include "rlgl.h"    
 #include "backend.h"
+#include "settings.h"
 #include "avatar.h"
 #include "config.h"
 #include "viseme_trainer.h"
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
+
+bool IsPathAbsolute(const char* path) {
+    if (!path || path[0] == '\0') return false;
+    if (strlen(path) >= 2 && isalpha(path[0]) && path[1] == ':') return true;
+    if (path[0] == '/' || path[0] == '\\') return true;
+    return false;
+}
 
 void DrawLayer(AvatarPart* p, float bounceY, float swayAngle, int currentCostume, bool isTalking, bool isBlinking, AvatarPart* activeMouth) {
     if (!p->active) return;
@@ -75,13 +84,22 @@ int main(int argc, char **argv)
     }
 
     Avatar myAvatar = {0};
+    char lastLoadedModel[512] = "";
 
     if (argc > 1 && IsFileExtension(argv[1], ".ora")) {
         LoadAvatarFromOra(argv[1], &myAvatar);
+        strncpy(lastLoadedModel, argv[1], sizeof(lastLoadedModel) - 1);
     } else if (config.defaultModelPath[0] != '\0') {
-        const char* defaultModelPath = TextFormat("%s%s", appDir, config.defaultModelPath);
-        if (FileExists(defaultModelPath)) {
-            LoadAvatarFromOra(defaultModelPath, &myAvatar);
+        char fullModelPath[1024];
+        if (IsPathAbsolute(config.defaultModelPath)) {
+            strcpy(fullModelPath, config.defaultModelPath);
+        } else {
+            sprintf(fullModelPath, "%s%s", appDir, config.defaultModelPath);
+        }
+        
+        if (FileExists(fullModelPath)) {
+            LoadAvatarFromOra(fullModelPath, &myAvatar);
+            strncpy(lastLoadedModel, config.defaultModelPath, sizeof(lastLoadedModel) - 1);
         }
     }
 
@@ -91,8 +109,46 @@ int main(int argc, char **argv)
 
     while (!WindowShouldClose())
     {
+        if (strcmp(lastLoadedModel, config.defaultModelPath) != 0) {
+            char fullModelPath[1024];
+            if (IsPathAbsolute(config.defaultModelPath)) {
+                strcpy(fullModelPath, config.defaultModelPath);
+            } else {
+                sprintf(fullModelPath, "%s%s", appDir, config.defaultModelPath);
+            }
+
+            if (FileExists(fullModelPath)) {
+                Avatar tempAvatar = {0};
+                LoadAvatarFromOra(fullModelPath, &tempAvatar);
+                if (tempAvatar.isLoaded) {
+                    UnloadAvatar(&myAvatar);
+                    myAvatar = tempAvatar;
+                    if (myAvatar.width > 0) SetWindowSize(myAvatar.width, myAvatar.height);
+                    strncpy(lastLoadedModel, config.defaultModelPath, sizeof(lastLoadedModel) - 1);
+                }
+            } else {
+                // If the file doesn't exist, we still mark it as "seen" to avoid repeated attempts
+                strncpy(lastLoadedModel, config.defaultModelPath, sizeof(lastLoadedModel) - 1);
+            }
+        }
+
         int key = GetConfiguredHotkey(config.hotkeys, MAX_HOTKEYS);
         if (key > 0) myAvatar.currentCostume = key;
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+            int menuResult = ShowContextMenu(GetWindowHandle());
+            if (menuResult == 1) { // Settings
+                OpenSettingsWindow(&config, configPath, visemePath);
+            } else if (menuResult == 2) { // Quit
+                break;
+            } else if (menuResult == 3) { // Toggle Border
+                if (IsWindowState(FLAG_WINDOW_UNDECORATED)) {
+                    ClearWindowState(FLAG_WINDOW_UNDECORATED);
+                } else {
+                    SetWindowState(FLAG_WINDOW_UNDECORATED);
+                }
+            }
+        }
 
         if (isTrainingMode) {
             if (IsKeyDown(KEY_FOUR)) VisemeSetTraining(VIS_SLOT_AA);
@@ -114,7 +170,7 @@ int main(int argc, char **argv)
         }
 
         float vol = GetMicrophoneVolume();
-        bool isTalking = vol > 0.15f;
+        bool isTalking = vol > config.voiceThreshold;
         float dt = GetFrameTime();
 
         reloadTimer += dt;
