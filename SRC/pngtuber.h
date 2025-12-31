@@ -2,6 +2,7 @@
 #define PNGTUBER_H
 
 #include "shared.h"
+#include "ora_loader.h"
 #include <stdio.h>
 
 void pngtuber_init(void) {
@@ -11,7 +12,7 @@ void pngtuber_init(void) {
     RGFW_getGlobalHints_OpenGL()->doubleBuffer = 1;
     RGFW_getGlobalHints_OpenGL()->alpha = 8;
 
-    win = RGFW_createWindow("Main Window", 100, 100, 800, 600, RGFW_windowOpenGL | RGFW_windowTransparent);
+    win = RGFW_createWindow("PNGTuberORA", 100, 100, 800, 600, RGFW_windowOpenGL | RGFW_windowTransparent);
     if (!win) {
         printf("Failed to create main window\n");
         running = 0;
@@ -27,6 +28,13 @@ void pngtuber_init(void) {
     }
 
     vg_win = nvglCreate(NVGL_DEBUG);
+    if (!vg_win) {
+        printf("[Error] Failed to create NanoVG context for main window\n");
+        RGFW_window_close(win);
+        win = NULL;
+        running = 0;
+        return;
+    }
     nvgCreateFontMem(vg_win, "sans", font_data, font_data_len, 0);
 
     RGFW_window_swapInterval_OpenGL(win, 0);
@@ -39,29 +47,18 @@ void pngtuber_handle_event(RGFW_event* event) {
     }
     if (event->type == RGFW_mouseButtonPressed) {
         if (event->button.value == RGFW_mouseRight) {
-            if (menu) {
-                RGFW_window_makeCurrentContext_OpenGL(menu);
-                if (vg_menu) nvglDelete(vg_menu);
-                RGFW_window_close(menu);
-                menu = NULL; vg_menu = NULL;
-            }
+            // Open menu window at mouse position
             i32 mx, my;
-            RGFW_getGlobalMouse(&mx, &my);
-            
-            menu_init(mx, my);
-        } else if (event->button.value == RGFW_mouseLeft) {
-            if (menu) {
-                RGFW_window_makeCurrentContext_OpenGL(menu);
-                if (vg_menu) nvglDelete(vg_menu);
-                RGFW_window_close(menu);
-                menu = NULL; vg_menu = NULL;
+            RGFW_window_getMouse(win, &mx, &my);
+            if (!menu) {
+                menu_show(mx, my);
             }
         }
     }
 }
 
 void pngtuber_draw(void) {
-    if (!win) return;
+    if (!win || !vg_win) return;
     RGFW_window_makeCurrentContext_OpenGL(win);
     glViewport(0, 0, win->w, win->h);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f); // Transparent background
@@ -69,12 +66,21 @@ void pngtuber_draw(void) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     nvgBeginFrame(vg_win, (float)win->w, (float)win->h, 1.0f);
-    nvgBeginPath(vg_win);
-    nvgFillColor(vg_win, UI_TEXT_COLOR);
-    nvgFontSize(vg_win, 20.0f);
-    nvgFontFace(vg_win, "sans");
-    nvgTextAlign(vg_win, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-    nvgText(vg_win, 10, 10, "Right click to open menu (Main window is transparent)", NULL);
+
+    if (g_avatar.isLoaded) {
+        // Draw the avatar
+        DrawAvatar(vg_win, &g_avatar, (float)win->w, (float)win->h);
+    } else {
+        // Show instructions when no avatar loaded
+        nvgBeginPath(vg_win);
+        nvgFillColor(vg_win, UI_TEXT_COLOR);
+        nvgFontSize(vg_win, 20.0f);
+        nvgFontFace(vg_win, "sans");
+        nvgTextAlign(vg_win, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+        nvgText(vg_win, 10, 10, "Right click to open menu", NULL);
+        nvgText(vg_win, 10, 35, "Load an ORA file from Settings", NULL);
+    }
+
     nvgEndFrame(vg_win);
     glFlush();
     RGFW_window_swapBuffers_OpenGL(win);

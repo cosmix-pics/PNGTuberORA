@@ -38,36 +38,39 @@ bool build(void)
             nob_cmd_append(&cmd, "rc.exe", "/nologo", "/fo", BUILD_FOLDER "icon.res", BUILD_FOLDER "icon.rc");
             if (!nob_cmd_run_opt(&cmd, (Nob_Cmd_Opt){0})) return false;
             cmd.count = 0;
-            nob_cmd_append(&cmd, "cl.exe", "/nologo", "/W3", "/D_CRT_SECURE_NO_WARNINGS",
-                           "SRC/main.c", "LIB/nanovgXC/nanovg.c", "LIB/glad/glad.c",
+            nob_cmd_append(&cmd, "cl.exe", "/nologo", "/W3", "/O2", "/D_CRT_SECURE_NO_WARNINGS",
+                           "SRC/main.c", "LIB/nanovgXC/nanovg.c", "LIB/glad/glad.c", "LIB/miniz.c",
                            BUILD_FOLDER "icon.res",
                            "/ILIB", "/ISRC", "/ILIB/stb", "/Ibuild",
                            "/Fe:" BUILD_FOLDER "PNGTuberORA.exe",
-                           "/link", "opengl32.lib", "gdi32.lib", "user32.lib", "shell32.lib");
+                           "/link", "opengl32.lib", "gdi32.lib", "user32.lib", "shell32.lib",
+                           "ole32.lib", "winmm.lib");
         #else
             nob_cmd_append(&cmd, "windres", BUILD_FOLDER "icon.rc", "-o", BUILD_FOLDER "icon.o");
             if (!nob_cmd_run(&cmd)) return false;
             cmd.count = 0;
-            nob_cmd_append(&cmd, "cc", "SRC/main.c", "LIB/nanovgXC/nanovg.c", "LIB/glad/glad.c",
+            nob_cmd_append(&cmd, "cc", "-O2", "SRC/main.c", "LIB/nanovgXC/nanovg.c", "LIB/glad/glad.c", "LIB/miniz.c",
                            BUILD_FOLDER "icon.o",
                            "-ILIB", "-ISRC", "-ILIB/stb", "-Ibuild",
-                           "-lopengl32", "-lgdi32",
+                           "-lopengl32", "-lgdi32", "-lole32", "-lwinmm",
                            "-o", BUILD_FOLDER "PNGTuberORA");
         #endif
     #elif defined(__APPLE__)
         // macOS
-        nob_cmd_append(&cmd, "cc", "SRC/main.c", "LIB/nanovgXC/nanovg.c", "LIB/glad/glad.c",
+        nob_cmd_append(&cmd, "cc", "-O2", "SRC/main.c", "LIB/nanovgXC/nanovg.c", "LIB/glad/glad.c", "LIB/miniz.c",
                        "-ILIB", "-ISRC", "-ILIB/stb", "-Ibuild",
                        "-framework", "Cocoa",
                        "-framework", "CoreVideo",
                        "-framework", "OpenGL",
                        "-framework", "IOKit",
+                       "-framework", "CoreAudio",
+                       "-framework", "AudioToolbox",
                        "-o", BUILD_FOLDER "PNGTuberORA");
     #else
         // Linux
-        nob_cmd_append(&cmd, "cc", "SRC/main.c", "LIB/nanovgXC/nanovg.c", "LIB/glad/glad.c",
+        nob_cmd_append(&cmd, "cc", "-O2", "SRC/main.c", "LIB/nanovgXC/nanovg.c", "LIB/glad/glad.c", "LIB/miniz.c",
                        "-ILIB", "-ISRC", "-ILIB/stb", "-Ibuild",
-                       "-lX11", "-lGL", "-lXrandr", "-lm",
+                       "-lX11", "-lGL", "-lXrandr", "-lm", "-lpthread", "-ldl",
                        "-o", BUILD_FOLDER "PNGTuberORA");
     #endif
     if (!nob_cmd_run_opt(&cmd, (Nob_Cmd_Opt){0})) return false;
