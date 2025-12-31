@@ -1,0 +1,52 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master, DEV]
+  pull_request:
+    branches: [main, master, DEV]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build
+        shell: cmd
+        run: build_msvc.bat
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PNGTuberORA-Windows
+          path: build/PNGTuberORA.exe
+          if-no-files-found: error
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          cc -o nob nob.c
+          ./nob
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PNGTuberORA-macOS
+          path: build/PNGTuberORA
+          if-no-files-found: error
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev libxrandr-dev libgl1-mesa-dev libxcursor-dev libxi-dev
+      - name: Build
+        run: |
+          cc -o nob nob.c
+          ./nob
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PNGTuberORA-Linux
+          path: build/PNGTuberORA
+          if-no-files-found: error
