@@ -3,71 +3,130 @@
 
 #include "shared.h"
 
-// Static state for menu
-static Button btnSpawnsettings = { 10, 10, 180, 40, "Settings" };
-static Button btnQuit = { 10, 60, 180, 40, "Quit" };
+// Menu window dimensions
+#define MENU_WIDTH 200
+#define MENU_HEIGHT 110
 
-void menu_init(int x, int y) {
-    // Menu height increased for 2 buttons
-    menu = RGFW_createWindow("Menu", x, y, 200, 110, RGFW_windowOpenGL | RGFW_windowNoBorder);
+// Menu button state
+static Button btnMenuSettings = { 10, 10, 180, 40, "Settings", 0 };
+static Button btnMenuQuit = { 10, 60, 180, 40, "Quit", 0 };
 
-    if (menu) {
-        backend_set_window_icon(menu);
-        RGFW_window_makeCurrentContext_OpenGL(menu);
-        gladLoadGLLoader((GLADloadproc)RGFW_getProcAddress_OpenGL);
-        vg_menu = nvglCreate(NVGL_DEBUG);
-        nvgCreateFontMem(vg_menu, "sans", font_data, font_data_len, 0);
-        RGFW_window_swapInterval_OpenGL(menu, 0);
+void menu_show(int x, int y) {
+    if (menu) return;  // Already open
+
+    // Deactivate current GL context before creating new window
+    DeactivateCurrentGLContext();
+
+    // Create menu window at screen position (x, y is relative to main window)
+    // Add main window position to get screen coordinates
+    int screenX = win->x + x;
+    int screenY = win->y + y;
+
+    menu = RGFW_createWindow("Menu", screenX, screenY, MENU_WIDTH, MENU_HEIGHT,
+                             RGFW_windowOpenGL | RGFW_windowNoResize | RGFW_windowNoBorder);
+    if (!menu) {
+        printf("[Error] Failed to create menu window\n");
+        return;
     }
+
+    RGFW_window_makeCurrentContext_OpenGL(menu);
+    gladLoadGLLoader((GLADloadproc)RGFW_getProcAddress_OpenGL);
+
+    vg_menu = nvglCreate(NVGL_DEBUG);
+    if (!vg_menu) {
+        printf("[Error] Failed to create NanoVG context for menu\n");
+        RGFW_window_close(menu);
+        menu = NULL;
+        return;
+    }
+
+    nvgCreateFontMem(vg_menu, "sans", font_data, font_data_len, 0);
+    RGFW_window_swapInterval_OpenGL(menu, 1);
+
+    g_menuVisible = 1;
 }
 
-void menu_handle_event(RGFW_event* event) {
-    if (event->type == RGFW_mousePosChanged) {
-        btnSpawnsettings.hovered = isPointInRect(event->mouse.x, event->mouse.y, btnSpawnsettings.x, btnSpawnsettings.y, btnSpawnsettings.w, btnSpawnsettings.h);
-        btnQuit.hovered = isPointInRect(event->mouse.x, event->mouse.y, btnQuit.x, btnQuit.y, btnQuit.w, btnQuit.h);
-
-        if (btnSpawnsettings.hovered || btnQuit.hovered) {
-            RGFW_window_setMouseStandard(menu, RGFW_mousePointingHand);
-        } else {
-            RGFW_window_setMouseStandard(menu, RGFW_mouseNormal);
-        }
-    }
-    if (event->type == RGFW_mouseButtonPressed) {
-        if (btnSpawnsettings.hovered) {
-            if (settings) {
-                RGFW_window_makeCurrentContext_OpenGL(settings);
-                if (vg_settings) nvglDelete(vg_settings);
-                RGFW_window_close(settings);
-                settings = NULL; vg_settings = NULL;
-            }
-            settings_init();
-            
-            // Close menu
-            RGFW_window_makeCurrentContext_OpenGL(menu);
-            if (vg_menu) nvglDelete(vg_menu);
-            RGFW_window_close(menu);
-            menu = NULL; vg_menu = NULL;
-        } else if (btnQuit.hovered) {
-            running = 0;
-        }
-    }
-    if (event->type == RGFW_focusOut) {
+void menu_hide(void) {
+    if (menu) {
         RGFW_window_makeCurrentContext_OpenGL(menu);
-        if (vg_menu) nvglDelete(vg_menu);
+        if (vg_menu) {
+            nvglDelete(vg_menu);
+            vg_menu = NULL;
+        }
         RGFW_window_close(menu);
-        menu = NULL; vg_menu = NULL;
+        menu = NULL;
     }
+    g_menuVisible = 0;
+}
+
+// Returns 1 if menu consumed the event
+int menu_handle_event(RGFW_event* event) {
+    if (!menu || !vg_menu) return 0;
+
+    if (event->type == RGFW_quit) {
+        menu_hide();
+        return 1;
+    }
+
+    // Get mouse position relative to menu window
+    i32 mx, my;
+    RGFW_window_getMouse(menu, &mx, &my);
+
+    if (event->type == RGFW_mousePosChanged) {
+        btnMenuSettings.hovered = isPointInRect((float)mx, (float)my,
+            btnMenuSettings.x, btnMenuSettings.y, btnMenuSettings.w, btnMenuSettings.h);
+        btnMenuQuit.hovered = isPointInRect((float)mx, (float)my,
+            btnMenuQuit.x, btnMenuQuit.y, btnMenuQuit.w, btnMenuQuit.h);
+        return 1;
+    }
+
+    if (event->type == RGFW_mouseButtonPressed && event->button.value == RGFW_mouseLeft) {
+        if (btnMenuSettings.hovered) {
+            menu_hide();
+            settings_init();
+            return 1;
+        } else if (btnMenuQuit.hovered) {
+            running = 0;
+            return 1;
+        }
+    }
+
+    // Close menu if it loses focus (clicked outside)
+    if (event->type == RGFW_focusOut) {
+        menu_hide();
+        return 1;
+    }
+
+    return 0;
 }
 
 void menu_draw(void) {
-    if (!menu) return;
+    if (!menu || !vg_menu) return;
+
     RGFW_window_makeCurrentContext_OpenGL(menu);
     glViewport(0, 0, menu->w, menu->h);
-    glClearColor(0.357f, 0.808f, 0.980f, 1.0f); // Blue
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
     nvgBeginFrame(vg_menu, (float)menu->w, (float)menu->h, 1.0f);
-    drawButton(vg_menu, &btnSpawnsettings);
-    drawButton(vg_menu, &btnQuit);
+
+    // Draw menu background
+    nvgBeginPath(vg_menu);
+    nvgRoundedRect(vg_menu, 0, 0, (float)MENU_WIDTH, (float)MENU_HEIGHT, 5.0f);
+    nvgFillColor(vg_menu, nvgRGBA(91, 206, 250, 255)); // Light blue
+    nvgFill(vg_menu);
+
+    // Draw border
+    nvgBeginPath(vg_menu);
+    nvgRoundedRect(vg_menu, 0, 0, (float)MENU_WIDTH, (float)MENU_HEIGHT, 5.0f);
+    nvgStrokeColor(vg_menu, nvgRGBA(255, 255, 255, 100));
+    nvgStrokeWidth(vg_menu, 2.0f);
+    nvgStroke(vg_menu);
+
+    // Draw buttons
+    drawButton(vg_menu, &btnMenuSettings);
+    drawButton(vg_menu, &btnMenuQuit);
+
     nvgEndFrame(vg_menu);
     glFlush();
     RGFW_window_swapBuffers_OpenGL(menu);
