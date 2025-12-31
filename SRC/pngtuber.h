@@ -1,0 +1,83 @@
+#ifndef PNGTUBER_H
+#define PNGTUBER_H
+
+#include "shared.h"
+#include <stdio.h>
+
+void pngtuber_init(void) {
+    RGFW_getGlobalHints_OpenGL()->major = 3;
+    RGFW_getGlobalHints_OpenGL()->minor = 3;
+    RGFW_getGlobalHints_OpenGL()->stencil = 8;
+    RGFW_getGlobalHints_OpenGL()->doubleBuffer = 1;
+    RGFW_getGlobalHints_OpenGL()->alpha = 8;
+
+    win = RGFW_createWindow("Main Window", 100, 100, 800, 600, RGFW_windowOpenGL | RGFW_windowTransparent);
+    if (!win) {
+        printf("Failed to create main window\n");
+        running = 0;
+        return;
+    }
+    backend_set_window_icon(win);
+
+    RGFW_window_makeCurrentContext_OpenGL(win);
+    if (!gladLoadGLLoader((GLADloadproc)RGFW_getProcAddress_OpenGL)) {
+        printf("Failed to load GLAD\n");
+        running = 0;
+        return;
+    }
+
+    vg_win = nvglCreate(NVGL_DEBUG);
+    nvgCreateFontMem(vg_win, "sans", font_data, font_data_len, 0);
+
+    RGFW_window_swapInterval_OpenGL(win, 0);
+}
+
+void pngtuber_handle_event(RGFW_event* event) {
+    if (event->type == RGFW_quit) {
+        running = 0;
+        return;
+    }
+    if (event->type == RGFW_mouseButtonPressed) {
+        if (event->button.value == RGFW_mouseRight) {
+            if (menu) {
+                RGFW_window_makeCurrentContext_OpenGL(menu);
+                if (vg_menu) nvglDelete(vg_menu);
+                RGFW_window_close(menu);
+                menu = NULL; vg_menu = NULL;
+            }
+            i32 mx, my;
+            RGFW_getGlobalMouse(&mx, &my);
+            
+            menu_init(mx, my);
+        } else if (event->button.value == RGFW_mouseLeft) {
+            if (menu) {
+                RGFW_window_makeCurrentContext_OpenGL(menu);
+                if (vg_menu) nvglDelete(vg_menu);
+                RGFW_window_close(menu);
+                menu = NULL; vg_menu = NULL;
+            }
+        }
+    }
+}
+
+void pngtuber_draw(void) {
+    if (!win) return;
+    RGFW_window_makeCurrentContext_OpenGL(win);
+    glViewport(0, 0, win->w, win->h);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f); // Transparent background
+    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    nvgBeginFrame(vg_win, (float)win->w, (float)win->h, 1.0f);
+    nvgBeginPath(vg_win);
+    nvgFillColor(vg_win, UI_TEXT_COLOR);
+    nvgFontSize(vg_win, 20.0f);
+    nvgFontFace(vg_win, "sans");
+    nvgTextAlign(vg_win, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+    nvgText(vg_win, 10, 10, "Right click to open menu (Main window is transparent)", NULL);
+    nvgEndFrame(vg_win);
+    glFlush();
+    RGFW_window_swapBuffers_OpenGL(win);
+}
+
+#endif

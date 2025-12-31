@@ -1,4 +1,4 @@
-/* nob - v1.25.1 - Public Domain - https://github.com/tsoding/nob.h
+/* nob - v1.27.0 - Public Domain - https://github.com/tsoding/nob.h
 
    This library is the next generation of the [NoBuild](https://github.com/tsoding/nobuild) idea.
 
@@ -50,7 +50,7 @@
       }
       ```
 
-      Not all the names have strippable prefixes. All the redefinable names like `NOB_GO_REBUILD_URSELF`
+      Not all the names have strippable prefixes. All the redefinable names like `NOB_REBUILD_URSELF`
       for instance will retain their prefix even if NOB_STRIP_PREFIX is enabled. Notable exception is the
       nob_log() function. Stripping away the prefix results in log() which was historically always referring
       to the natural logarithmic function that is already defined in math.h. So there is no reason to strip
@@ -76,7 +76,7 @@
         See https://github.com/nothings/stb/blob/f58f558c120e9b32c217290b80bad1a0729fbb2c/docs/stb_howto.txt
         for more info.
       - NOB_WARN_DEPRECATED - Warn about the usage of deprecated function. We rarely actually remove deprecated functions,
-        but if you want to know what is discourage you may want to enable this flag.
+        but if you want to know what is discouraged you may want to enable this flag.
       - NOB_EXPERIMENTAL_DELETE_OLD - Experimental feature that automatically removes `nob.old` files. It's unclear how well
         it works on Windows, so it's experimental for now.
       - NOB_STRIP_PREFIX - string the `nob_` prefixes from non-redefinable names.
@@ -100,8 +100,10 @@
 #ifndef NOB_H_
 #define NOB_H_
 #ifdef _WIN32
-#define _CRT_SECURE_NO_WARNINGS (1)
-#endif
+#    ifndef _CRT_SECURE_NO_WARNINGS
+#        define _CRT_SECURE_NO_WARNINGS (1)
+#    endif // _CRT_SECURE_NO_WARNINGS
+#endif //  _WIN32
 
 #ifndef NOBDEF
 /*
@@ -164,6 +166,9 @@
 #    ifdef __APPLE__
 #        include <mach-o/dyld.h>
 #    endif
+#    ifdef __FreeBSD__
+#        include <sys/sysctl.h>
+#    endif
 #    include <sys/types.h>
 #    include <sys/wait.h>
 #    include <sys/stat.h>
@@ -206,6 +211,14 @@ typedef enum {
 
 // Any messages with the level below nob_minimal_log_level are going to be suppressed.
 extern Nob_Log_Level nob_minimal_log_level;
+
+typedef void (nob_log_handler)(Nob_Log_Level level, const char *fmt, va_list args);
+
+NOBDEF void nob_set_log_handler(nob_log_handler *handler);
+NOBDEF nob_log_handler *nob_get_log_handler(void);
+
+NOBDEF nob_log_handler nob_default_log_handler;
+NOBDEF nob_log_handler nob_cancer_log_handler;
 
 NOBDEF void nob_log(Nob_Log_Level level, const char *fmt, ...) NOB_PRINTF_FORMAT(2, 3);
 
@@ -413,6 +426,8 @@ typedef struct {
     Nob_Procs *async;
     // Maximum processes allowed in the .async list. Zero implies nob_nprocs().
     size_t max_procs;
+    // Do not reset the command after execution.
+    bool dont_reset;
     // Redirect stdin to file
     const char *stdin_path;
     // Redirect stdout to file
@@ -484,7 +499,7 @@ NOBDEF void nob_cmd_render(Nob_Cmd cmd, Nob_String_Builder *render);
 #define nob_cmd_free(cmd) NOB_FREE(cmd.items)
 
 // Run command asynchronously
-NOB_DEPRECATED("Use `nob_cmd_run(&cmd, .async = &procs)` instead, but keep in mind that it always resets the cmd array.")
+NOB_DEPRECATED("Use `nob_cmd_run(&cmd, .async = &procs, .dont_reset = true)`.")
 NOBDEF Nob_Proc nob_cmd_run_async(Nob_Cmd cmd);
 
 // nob_cmd_run_async_and_reset() is just like nob_cmd_run_async() except it also resets cmd.count to 0
@@ -497,8 +512,9 @@ NOB_DEPRECATED("Use `nob_cmd_run(&cmd, "
                ".async = &procs, "
                ".stdin_path = \"path/to/stdin\", "
                ".stdout_path = \"path/to/stdout\", "
-               ".stderr_path = \"path/to/stderr\")` instead, "
-               "but keep in mind that it always resets the cmd array.")
+               ".stderr_path = \"path/to/stderr\", "
+               ".dont_reset = true"
+               ")` instead.")
 NOBDEF Nob_Proc nob_cmd_run_async_redirect(Nob_Cmd cmd, Nob_Cmd_Redirect redirect);
 
 // Run redirected command asynchronously and set cmd.count to 0 and close all the opened files
@@ -510,8 +526,7 @@ NOB_DEPRECATED("Use `nob_cmd_run(&cmd, "
 NOBDEF Nob_Proc nob_cmd_run_async_redirect_and_reset(Nob_Cmd *cmd, Nob_Cmd_Redirect redirect);
 
 // Run command synchronously
-NOB_DEPRECATED("Use `nob_cmd_run(&cmd)` instead, "
-               "but keep in mind that it always resets the cmd array.")
+NOB_DEPRECATED("Use `nob_cmd_run(&cmd, .dont_reset = true)` instead.")
 NOBDEF bool nob_cmd_run_sync(Nob_Cmd cmd);
 
 // NOTE: nob_cmd_run_sync_and_reset() is just like nob_cmd_run_sync() except it also resets cmd.count to 0
@@ -523,8 +538,9 @@ NOBDEF bool nob_cmd_run_sync_and_reset(Nob_Cmd *cmd);
 NOB_DEPRECATED("Use `nob_cmd_run(&cmd, "
                ".stdin_path  = \"path/to/stdin\", "
                ".stdout_path = \"path/to/stdout\", "
-               ".stderr_path = \"path/to/stderr\")` instead, "
-               "but keep in mind that it always resets the cmd array.")
+               ".stderr_path = \"path/to/stderr\", "
+               ".dont_reset = true"
+               ")` instead.")
 NOBDEF bool nob_cmd_run_sync_redirect(Nob_Cmd cmd, Nob_Cmd_Redirect redirect);
 
 // Run redirected command synchronously and set cmd.count to 0 and close all the opened files
@@ -541,6 +557,7 @@ NOBDEF char *nob_temp_strdup(const char *cstr);
 NOBDEF char *nob_temp_strndup(const char *cstr, size_t size);
 NOBDEF void *nob_temp_alloc(size_t size);
 NOBDEF char *nob_temp_sprintf(const char *format, ...) NOB_PRINTF_FORMAT(1, 2);
+NOBDEF char *nob_temp_vsprintf(const char *format, va_list ap);
 // nob_temp_reset() - Resets the entire temporary storage to 0.
 //
 // It is generally not recommended to call this function ever. What you usually want to do is let's say you have a loop,
@@ -611,7 +628,7 @@ NOBDEF char *nob_temp_running_executable_path(void);
 
 #ifndef nob_cc_output
 #  if defined(_MSC_VER) && !defined(__clang__)
-#    define nob_cc_output(cmd, output_path) nob_cmd_append(cmd, nob_temp_sprintf("/Fe:%s", (output_path)))
+#    define nob_cc_output(cmd, output_path) nob_cmd_append(cmd, nob_temp_sprintf("/Fe:%s", (output_path)), nob_temp_sprintf("/Fo:%s", (output_path)))
 #  else
 #    define nob_cc_output(cmd, output_path) nob_cmd_append(cmd, "-o", (output_path))
 #  endif
@@ -1104,7 +1121,7 @@ defer:
     if (opt_fdin)  nob_fd_close(*opt_fdin);
     if (opt_fdout) nob_fd_close(*opt_fdout);
     if (opt_fderr) nob_fd_close(*opt_fderr);
-    cmd->count = 0;
+    if (!opt.dont_reset) cmd->count = 0;
     return result;
 }
 
@@ -1169,10 +1186,11 @@ static Nob_Proc nob__cmd_start_process(Nob_Cmd cmd, Nob_Fd *fdin, Nob_Fd *fdout,
     PROCESS_INFORMATION piProcInfo;
     ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
 
-    nob__win32_cmd_quote(cmd, &sb);
-    nob_sb_append_null(&sb);
-    BOOL bSuccess = CreateProcessA(NULL, sb.items, NULL, NULL, TRUE, 0, NULL, NULL, &siStartInfo, &piProcInfo);
-    nob_sb_free(sb);
+    Nob_String_Builder quoted = {0};
+    nob__win32_cmd_quote(cmd, &quoted);
+    nob_sb_append_null(&quoted);
+    BOOL bSuccess = CreateProcessA(NULL, quoted.items, NULL, NULL, TRUE, 0, NULL, NULL, &siStartInfo, &piProcInfo);
+    nob_sb_free(quoted);
 
     if (!bSuccess) {
         nob_log(NOB_ERROR, "Could not create child process for %s: %s", cmd.items[0], nob_win32_error_message(GetLastError()));
@@ -1535,7 +1553,19 @@ NOBDEF bool nob_cmd_run_sync_redirect_and_reset(Nob_Cmd *cmd, Nob_Cmd_Redirect r
     return nob_proc_wait(p);
 }
 
-NOBDEF void nob_log(Nob_Log_Level level, const char *fmt, ...)
+static nob_log_handler *nob__log_handler = &nob_default_log_handler;
+
+NOBDEF void nob_set_log_handler(nob_log_handler *handler)
+{
+    nob__log_handler = handler;
+}
+
+NOBDEF nob_log_handler *nob_get_log_handler(void)
+{
+    return nob__log_handler;
+}
+
+NOBDEF void nob_default_log_handler(Nob_Log_Level level, const char *fmt, va_list args)
 {
     if (level < nob_minimal_log_level) return;
 
@@ -1551,14 +1581,40 @@ NOBDEF void nob_log(Nob_Log_Level level, const char *fmt, ...)
         break;
     case NOB_NO_LOGS: return;
     default:
-        NOB_UNREACHABLE("nob_log");
+        NOB_UNREACHABLE("Nob_Log_Level");
     }
 
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+}
+
+NOBDEF void nob_cancer_log_handler(Nob_Log_Level level, const char *fmt, va_list args)
+{
+    switch (level) {
+    case NOB_INFO:
+        fprintf(stderr, "ℹ️ \x1b[36m[INFO]\x1b[0m ");
+        break;
+    case NOB_WARNING:
+        fprintf(stderr, "⚠️ \x1b[33m[WARNING]\x1b[0m ");
+        break;
+    case NOB_ERROR:
+        fprintf(stderr, "🚨 \x1b[31m[ERROR]\x1b[0m ");
+        break;
+    case NOB_NO_LOGS: return;
+    default:
+        NOB_UNREACHABLE("Nob_Log_Level");
+    }
+
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+}
+
+NOBDEF void nob_log(Nob_Log_Level level, const char *fmt, ...)
+{
     va_list args;
     va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
+    nob__log_handler(level, fmt, args);
     va_end(args);
-    fprintf(stderr, "\n");
 }
 
 NOBDEF bool nob_read_entire_dir(const char *parent, Nob_File_Paths *children)
@@ -1770,10 +1826,10 @@ NOBDEF void *nob_temp_alloc(size_t requested_size)
     return result;
 }
 
-NOBDEF char *nob_temp_sprintf(const char *format, ...)
+NOBDEF char *nob_temp_vsprintf(const char *format, va_list ap)
 {
     va_list args;
-    va_start(args, format);
+    va_copy(args, ap);
     int n = vsnprintf(NULL, 0, format, args);
     va_end(args);
 
@@ -1781,10 +1837,19 @@ NOBDEF char *nob_temp_sprintf(const char *format, ...)
     char *result = (char*)nob_temp_alloc(n + 1);
     NOB_ASSERT(result != NULL && "Extend the size of the temporary allocator");
     // TODO: use proper arenas for the temporary allocator;
-    va_start(args, format);
+    va_copy(args, ap);
     vsnprintf(result, n + 1, format, args);
     va_end(args);
 
+    return result;
+}
+
+NOBDEF char *nob_temp_sprintf(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    char *result = nob_temp_vsprintf(format, args);
+    va_end(args);
     return result;
 }
 
@@ -2226,6 +2291,12 @@ NOBDEF char *nob_temp_running_executable_path(void)
     if (_NSGetExecutablePath(buf, &size) != 0) return "";
     int length = strlen(buf);
     return nob_temp_strndup(buf, length);
+#elif defined(__FreeBSD__)
+    char buf[4096];
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
+    size_t length = sizeof(buf);
+    if (sysctl(mib, 4, buf, &length, NULL, 0) < 0) return "";
+    return nob_temp_strndup(buf, length);
 #else
     fprintf(stderr, "%s:%d: TODO: nob_temp_running_executable_path is not implemented for this platform\n", __FILE__, __LINE__);
     return "";
@@ -2341,11 +2412,18 @@ NOBDEF int closedir(DIR *dirp)
         #define NO_LOGS NOB_NO_LOGS
         #define Log_Level Nob_Log_Level
         #define minimal_log_level nob_minimal_log_level
+        #define log_handler nob_log_handler
+        #define set_log_handler nob_set_log_handler
+        #define get_log_handler nob_get_log_handler
+        #define default_log_handler nob_default_log_handler
+        #define cancer_log_handler nob_cancer_log_handler
         // NOTE: Name log is already defined in math.h and historically always was the natural logarithmic function.
         // So there should be no reason to strip the `nob_` prefix in this specific case.
         // #define log nob_log
         #define shift nob_shift
         #define shift_args nob_shift_args
+        #define GO_REBUILD_URSELF NOB_GO_REBUILD_URSELF
+        #define GO_REBUILD_URSELF_PLUS NOB_GO_REBUILD_URSELF_PLUS
         #define File_Paths Nob_File_Paths
         #define FILE_REGULAR NOB_FILE_REGULAR
         #define FILE_DIRECTORY NOB_FILE_DIRECTORY
@@ -2411,6 +2489,7 @@ NOBDEF int closedir(DIR *dirp)
         #define temp_strndup nob_temp_strndup
         #define temp_alloc nob_temp_alloc
         #define temp_sprintf nob_temp_sprintf
+        #define temp_vsprintf nob_temp_vsprintf
         #define temp_reset nob_temp_reset
         #define temp_save nob_temp_save
         #define temp_rewind nob_temp_rewind
@@ -2449,7 +2528,20 @@ NOBDEF int closedir(DIR *dirp)
 /*
    Revision history:
 
-     1.25.1 (2025-11-06) Fix forward declaration of _NSGetExecutablePath on MacOS (by agss0)
+     1.27.0 (2025-12-30) Add .dot_reset option to cmd_run (by @Israel77)
+                         Fix support for FreeBSD (by @cqundefine)
+                         Strip prefixes from NOB_GO_REBUILD_URSELF and NOB_GO_REBUILD_URSELF_PLUS (by @huwwa)
+                         Add /Fo flag to MSVC version of nob_cc_output() (by @ratchetfreak)
+     1.26.0 (2025-12-28) Introduce customizable log handlers (by @rexim)
+                           - Add nob_log_handler
+                           - Add nob_set_log_handler
+                           - Add nob_get_log_handler
+                           - Add nob_default_log_handler
+                           - Add nob_cancer_log_handler
+                         Introduce nob_temp_vsprintf (by @rexim)
+                         Fix compilation error on Windows when NOB_NO_ECHO is enabled (by @mlorenc227)
+                         Do not redefine _CRT_SECURE_NO_WARNINGS if it's already defined (by @vylsaz)
+     1.25.1 (2025-11-06) Fix forward declaration of _NSGetExecutablePath on MacOS (by @agss0)
      1.25.0 (2025-10-25)   - Add nob_sb_pad_align()
                            - Add nob_swap()
                            - Add nob_temp_strndup()
