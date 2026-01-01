@@ -6,7 +6,10 @@ typedef enum {
     LAYER_EYE_OPEN,
     LAYER_EYE_CLOSED,
     LAYER_MOUTH_OPEN,
-    LAYER_MOUTH_CLOSED
+    LAYER_MOUTH_CLOSED,
+    LAYER_MOUTH_AA,
+    LAYER_MOUTH_OU,
+    LAYER_MOUTH_CH
 } LayerType;
 
 typedef struct {
@@ -18,6 +21,7 @@ typedef struct {
     float pivotOffsetX;
     float pivotOffsetY;
     int hasPivot;
+    float phaseOffset;      // Random phase for organic movement
     char name[64];
     float opacity;
     int active;
@@ -28,7 +32,11 @@ typedef struct {
     AvatarPart layers[100];
     int layerCount;
     int currentCostume;
-    float swayAngle;
+    int currentViseme;      // Current viseme slot
+    float swayIntensity;    // Magnitude of the sway
+    float swayTime;         // Accumulated time for sway sine wave
+    float bounceY;
+    float bounceVelocity;   // Physics velocity for bobbing
     float blinkTimer;
     float nextBlinkTime;
     int isBlinking;

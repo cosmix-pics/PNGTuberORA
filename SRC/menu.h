@@ -82,7 +82,9 @@ int menu_handle_event(RGFW_event* event) {
 
     if (event->type == RGFW_mouseButtonPressed && event->button.value == RGFW_mouseLeft) {
         if (btnMenuSettings.hovered) {
-            menu_hide();
+            menu_hide();=
+            settings_close();
+            dialog_close();
             settings_init();
             return 1;
         } else if (btnMenuQuit.hovered) {
@@ -91,7 +93,6 @@ int menu_handle_event(RGFW_event* event) {
         }
     }
 
-    // Close menu if it loses focus (clicked outside)
     if (event->type == RGFW_focusOut) {
         menu_hide();
         return 1;
@@ -113,13 +114,13 @@ void menu_draw(void) {
     // Draw menu background
     nvgBeginPath(vg_menu);
     nvgRoundedRect(vg_menu, 0, 0, (float)MENU_WIDTH, (float)MENU_HEIGHT, 5.0f);
-    nvgFillColor(vg_menu, nvgRGBA(91, 206, 250, 255)); // Light blue
+    nvgFillColor(vg_menu, ui_button_active); // Use active color for menu bg
     nvgFill(vg_menu);
 
     // Draw border
     nvgBeginPath(vg_menu);
     nvgRoundedRect(vg_menu, 0, 0, (float)MENU_WIDTH, (float)MENU_HEIGHT, 5.0f);
-    nvgStrokeColor(vg_menu, nvgRGBA(255, 255, 255, 100));
+    nvgStrokeColor(vg_menu, ui_button_border);
     nvgStrokeWidth(vg_menu, 2.0f);
     nvgStroke(vg_menu);
 

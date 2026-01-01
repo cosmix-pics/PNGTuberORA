@@ -128,6 +128,8 @@ static void LoadAvatarFromOra(void* vgCtx, const char* filepath, Avatar* avatar)
             part.opacity = opacity;
             part.active = 1;
             part.hasPivot = 0;
+            // Random phase offset 0 to 2PI for independent direction
+            part.phaseOffset = ((float)rand() / RAND_MAX) * 6.28318f;
 
             ToLowerStr(name);
             strncpy(part.name, name, 63);
@@ -152,6 +154,12 @@ static void LoadAvatarFromOra(void* vgCtx, const char* filepath, Avatar* avatar)
                     part.type = LAYER_EYE_CLOSED;
                 } else if (strstr(name, "eye")) {
                     part.type = LAYER_EYE_OPEN;
+                } else if (strstr(name, "[aa]")) {
+                    part.type = LAYER_MOUTH_AA;
+                } else if (strstr(name, "[ou]")) {
+                    part.type = LAYER_MOUTH_OU;
+                } else if (strstr(name, "[ch]")) {
+                    part.type = LAYER_MOUTH_CH;
                 } else if (strstr(name, "mouth") && (strstr(name, "open") || strstr(name, "talk"))) {
                     part.type = LAYER_MOUTH_OPEN;
                 } else if (strstr(name, "mouth")) {
@@ -186,6 +194,10 @@ static void LoadAvatarFromOra(void* vgCtx, const char* filepath, Avatar* avatar)
     avatar->lastModTime = GetFileModTime(filepath);
 }
 
+static float Lerp(float a, float b, float t) {
+    return a + t * (b - a);
+}
+
 static void UpdateAvatar(Avatar* avatar, float deltaTime, float volume, float threshold, int hotkeyPressed) {
     if (!avatar->isLoaded) return;
 
@@ -208,15 +220,80 @@ static void UpdateAvatar(Avatar* avatar, float deltaTime, float volume, float th
     // Talking based on volume threshold
     avatar->isTalking = (volume > threshold) ? 1 : 0;
 
+    // Viseme logic
+    if (avatar->isTalking) {
+        avatar->currentViseme = VisemeGetBest();
+    } else {
+        avatar->currentViseme = -1;
+    }
+
+    // Sway and Bounce Logic
+    avatar->swayTime += deltaTime;
+    
+    // Clamp deltaTime to prevent physics jitters if window is moved or lags
+    float physicsDt = deltaTime;
+    if (physicsDt > 0.033f) physicsDt = 0.033f; 
+
+    if (avatar->isTalking) {
+        // Sway intensity based on volume
+        float targetIntensity = volume * 3.0f * (3.14159f / 180.0f);
+        
+        // Attack (Fast rise)
+        if (targetIntensity > avatar->swayIntensity) {
+             avatar->swayIntensity = Lerp(avatar->swayIntensity, targetIntensity, 0.2f);
+        } else {
+             // Decay (Slow fall)
+             avatar->swayIntensity = Lerp(avatar->swayIntensity, targetIntensity, 0.05f);
+        }
+    } else {
+        // Decay to rest
+        avatar->swayIntensity = Lerp(avatar->swayIntensity, 0.0f, 0.05f);
+    }
+
+    // Velocity-based Spring Bounce
+    float targetBounce = (avatar->isTalking) ? (volume * 25.0f) : 0.0f;
+    
+    // Physics constants - Higher stiffness for faster bob
+    const float stiffness = 300.0f;
+    const float damping = 45.0f;
+
+    // Spring calculation: a = (k * displacement) - (d * velocity)
+    float displacement = targetBounce - avatar->bounceY;
+    float springForce = displacement * stiffness;
+    float dampingForce = avatar->bounceVelocity * damping;
+    float acceleration = springForce - dampingForce;
+
+    avatar->bounceVelocity += acceleration * physicsDt;
+    avatar->bounceY += avatar->bounceVelocity * physicsDt;
+
     // Costume switching via hotkey
     if (hotkeyPressed > 0 && hotkeyPressed <= 9) {
         avatar->currentCostume = hotkeyPressed;
     }
 }
 
+static int HasLayerType(Avatar* avatar, LayerType type) {
+    for (int i = 0; i < avatar->layerCount; i++) {
+        if (avatar->layers[i].type == type && 
+            (avatar->layers[i].costumeId == 0 || avatar->layers[i].costumeId == avatar->currentCostume)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void DrawAvatar(void* vgCtx, Avatar* avatar, float windowWidth, float windowHeight) {
     NVGcontext* vg = (NVGcontext*)vgCtx;
     if (!avatar->isLoaded) return;
+
+    // Determine which mouth layer to show
+    LayerType mouthToShow = LAYER_MOUTH_CLOSED;
+    if (avatar->isTalking) {
+        mouthToShow = LAYER_MOUTH_OPEN;
+        if (avatar->currentViseme == VIS_SLOT_AA && HasLayerType(avatar, LAYER_MOUTH_AA)) mouthToShow = LAYER_MOUTH_AA;
+        else if (avatar->currentViseme == VIS_SLOT_OU && HasLayerType(avatar, LAYER_MOUTH_OU)) mouthToShow = LAYER_MOUTH_OU;
+        else if (avatar->currentViseme == VIS_SLOT_CH && HasLayerType(avatar, LAYER_MOUTH_CH)) mouthToShow = LAYER_MOUTH_CH;
+    }
 
     // Calculate scale to fit avatar in window
     float scaleX = windowWidth / (float)avatar->width;
@@ -234,8 +311,13 @@ static void DrawAvatar(void* vgCtx, Avatar* avatar, float windowWidth, float win
         // Skip based on state
         if (part->type == LAYER_EYE_CLOSED && !avatar->isBlinking) continue;
         if (part->type == LAYER_EYE_OPEN && avatar->isBlinking) continue;
-        if (part->type == LAYER_MOUTH_OPEN && !avatar->isTalking) continue;
-        if (part->type == LAYER_MOUTH_CLOSED && avatar->isTalking) continue;
+        
+        // Mouth logic
+        if (part->type == LAYER_MOUTH_OPEN || part->type == LAYER_MOUTH_CLOSED || 
+            part->type == LAYER_MOUTH_AA || part->type == LAYER_MOUTH_OU || part->type == LAYER_MOUTH_CH) {
+            if (part->type != mouthToShow) continue;
+        }
+
         if (part->costumeId > 0 && part->costumeId != avatar->currentCostume) continue;
 
         // Calculate position with scale
@@ -243,6 +325,24 @@ static void DrawAvatar(void* vgCtx, Avatar* avatar, float windowWidth, float win
         float dy = offsetY + part->y * scale;
         float dw = part->width * scale;
         float dh = part->height * scale;
+        
+        // Apply bounce (subtract to move up)
+        dy -= avatar->bounceY * scale;
+
+        nvgSave(vg);
+
+        // Apply Rotation if pivot exists
+        if (part->hasPivot) {
+            float px = dx + part->pivotOffsetX * scale;
+            float py = dy + part->pivotOffsetY * scale;
+            
+            // Calculate individual layer rotation
+            float layerAngle = sinf(avatar->swayTime * 15.0f + part->phaseOffset) * avatar->swayIntensity;
+
+            nvgTranslate(vg, px, py);
+            nvgRotate(vg, layerAngle);
+            nvgTranslate(vg, -px, -py);
+        }
 
         // Create image pattern
         NVGpaint imgPaint = nvgImagePattern(vg, dx, dy, dw, dh, 0, part->nvgImage, part->opacity);
@@ -251,6 +351,8 @@ static void DrawAvatar(void* vgCtx, Avatar* avatar, float windowWidth, float win
         nvgRect(vg, dx, dy, dw, dh);
         nvgFillPaint(vg, imgPaint);
         nvgFill(vg);
+        
+        nvgRestore(vg);
     }
 }
 

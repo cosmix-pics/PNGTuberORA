@@ -52,7 +52,7 @@ bool build(void)
             nob_cmd_append(&cmd, "cc", "-O2", "SRC/main.c", "LIB/nanovgXC/nanovg.c", "LIB/glad/glad.c", "LIB/miniz.c",
                            BUILD_FOLDER "icon.o",
                            "-ILIB", "-ISRC", "-ILIB/stb", "-Ibuild",
-                           "-lopengl32", "-lgdi32", "-lole32", "-lwinmm",
+                           "-lopengl32", "-lgdi32",// "-lole32", "-lwinmm",
                            "-o", BUILD_FOLDER "PNGTuberORA");
         #endif
     #elif defined(__APPLE__)

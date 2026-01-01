@@ -45,6 +45,7 @@ void pngtuber_handle_event(RGFW_event* event) {
         running = 0;
         return;
     }
+
     if (event->type == RGFW_mouseButtonPressed) {
         if (event->button.value == RGFW_mouseRight) {
             // Open menu window at mouse position
@@ -52,6 +53,11 @@ void pngtuber_handle_event(RGFW_event* event) {
             RGFW_window_getMouse(win, &mx, &my);
             if (!menu) {
                 menu_show(mx, my);
+            }
+        } else if (event->button.value == RGFW_mouseLeft) {
+            // Close menu if clicking main window
+            if (menu) {
+                menu_hide();
             }
         }
     }
@@ -64,7 +70,7 @@ void pngtuber_draw(void) {
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f); // Transparent background
     glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     nvgBeginFrame(vg_win, (float)win->w, (float)win->h, 1.0f);
 
     if (g_avatar.isLoaded) {
@@ -73,7 +79,7 @@ void pngtuber_draw(void) {
     } else {
         // Show instructions when no avatar loaded
         nvgBeginPath(vg_win);
-        nvgFillColor(vg_win, UI_TEXT_COLOR);
+        nvgFillColor(vg_win, ui_text_color);
         nvgFontSize(vg_win, 20.0f);
         nvgFontFace(vg_win, "sans");
         nvgTextAlign(vg_win, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);

@@ -12,6 +12,7 @@ typedef struct {
     char defaultModelPath[512];
     int hotkeys[MAX_HOTKEYS];
     float voiceThreshold;
+    int theme; // 0=Trans, 1=Dark, 2=White
 } AppConfig;
 
 static int ParseKeyName(const char* name) {
@@ -84,6 +85,8 @@ static void LoadConfig(const char* filename, AppConfig* config) {
             strncpy(config->defaultModelPath, val, sizeof(config->defaultModelPath) - 1);
         } else if (strcmp(key, "voice_threshold") == 0) {
             config->voiceThreshold = (float)atof(val);
+        } else if (strcmp(key, "theme") == 0) {
+            config->theme = atoi(val);
         } else if (strncmp(key, "costume_", 8) == 0) {
             int idx = atoi(key + 8) - 1;
             if (idx >= 0 && idx < MAX_HOTKEYS) {
@@ -102,6 +105,7 @@ static void SaveConfig(const char* filename, const AppConfig* config) {
     fprintf(f, "# PNGTuber ORA Configuration\n");
     fprintf(f, "default_model = %s\n", config->defaultModelPath);
     fprintf(f, "voice_threshold = %.3f\n", config->voiceThreshold);
+    fprintf(f, "theme = %d\n", config->theme);
     fprintf(f, "\n# Hotkeys for costumes 1-9 (Format: A-Z, 0-9, F1-F12)\n");
     for (int i = 0; i < MAX_HOTKEYS; i++) {
         fprintf(f, "costume_%d = %s\n", i + 1, GetVKName(config->hotkeys[i]));
@@ -114,6 +118,7 @@ static void SaveDefaultConfig(const char* filename) {
     strcpy(config.defaultModelPath, "");
     for (int i = 0; i < MAX_HOTKEYS; i++) config.hotkeys[i] = '1' + i;
     config.voiceThreshold = 0.15f;
+    config.theme = 0;
     SaveConfig(filename, &config);
 }
 

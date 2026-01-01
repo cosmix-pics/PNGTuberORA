@@ -137,7 +137,7 @@ static void GetConfigPaths(void) {
 #endif
 }
 
-int main(void) {
+int main(int argc, char** argv) {
     // Install crash handler first
     InstallCrashHandler();
 
@@ -151,6 +151,9 @@ int main(void) {
 
     // Load configuration
     LoadConfig(g_configPath, &g_config);
+
+    // Initialize UI Theme
+    SetTheme(g_config.theme);
 
     // Initialize audio and viseme
     VisemeInit();
@@ -172,6 +175,7 @@ int main(void) {
 
     // Timing for animation using clock()
     clock_t lastClock = clock();
+    float reloadCheckTimer = 0.0f;
 
     while (running && RGFW_window_shouldClose(win) == RGFW_FALSE) {
         RGFW_pollEvents();
@@ -180,6 +184,19 @@ int main(void) {
         clock_t currentClock = clock();
         float deltaTime = (float)(currentClock - lastClock) / CLOCKS_PER_SEC;
         lastClock = currentClock;
+
+        // Auto-reload avatar if file changed
+        if (g_avatar.isLoaded) {
+            reloadCheckTimer += deltaTime;
+            if (reloadCheckTimer >= 1.0f) { // Check every second
+                reloadCheckTimer = 0.0f;
+                long modTime = GetFileModTime(g_avatar.filePath);
+                if (modTime > g_avatar.lastModTime) {
+                    printf("Reloading avatar: %s\n", g_avatar.filePath);
+                    LoadAvatarFromOra(vg_win, g_avatar.filePath, &g_avatar);
+                }
+            }
+        }
 
         // Update avatar state
         float volume = GetMicrophoneVolume();

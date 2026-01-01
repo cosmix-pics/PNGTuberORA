@@ -7,19 +7,19 @@
 #include <stdio.h>
 
 // Settings window dimensions
-#define SETTINGS_WIDTH 500
-#define SETTINGS_HEIGHT 520
+#define SETTINGS_WIDTH 600
+#define SETTINGS_HEIGHT 640
 
 // UI State
-static Slider sliderVolume = { 20, 70, 440, 20, 0.15f, 0 };
-static TextDisplay txtModelPath = { 20, 140, 350, 28, "" };
-static Button btnBrowse = { 380, 140, 100, 28, "Browse...", 0 };
-static Button btnCloseSettings = { 400, 10, 80, 28, "Close", 0 };
+static Slider sliderVolume = { 20, 50, 560, 20, 0.15f, 0 };
+static TextDisplay txtModelPath = { 20, 120, 410, 28, "" };
+static Button btnBrowse = { 440, 120, 140, 28, "Browse...", 0 };
+static Button btnTheme = { 400, 10, 180, 28, "Theme: Trans", 0 };
 
 // Viseme training
 static ProgressBar visBars[4];
 static Button visButtons[5];  // None, Silence, CH, OU, AA
-static Button btnSaveViseme = { 400, 330, 80, 28, "Save", 0 };
+static Button btnSaveViseme = { 500, 350, 80, 28, "Save", 0 };
 static int currentTrainingSlot = -1;
 
 // Hotkey buttons
@@ -27,6 +27,14 @@ static HotkeyButton hotkeyBtns[MAX_HOTKEYS];
 static int waitingForKeyIdx = -1;
 
 static int settings_initialized = 0;
+
+static void UpdateThemeButtonText(void) {
+    switch (g_config.theme) {
+        case THEME_TRANS: btnTheme.text = "Theme: Trans"; break;
+        case THEME_DARK:  btnTheme.text = "Theme: Dark"; break;
+        case THEME_WHITE: btnTheme.text = "Theme: White"; break;
+    }
+}
 
 void settings_init(void) {
     // Deactivate current GL context before creating new window
@@ -53,6 +61,10 @@ void settings_init(void) {
 
     nvgCreateFontMem(vg_settings, "sans", font_data, font_data_len, 0);
     RGFW_window_swapInterval_OpenGL(settings, 1);
+    
+    // Apply current theme
+    SetTheme(g_config.theme);
+    UpdateThemeButtonText();
 
     // Initialize UI state from config
     sliderVolume.value = g_config.voiceThreshold;
@@ -60,30 +72,30 @@ void settings_init(void) {
 
     // Initialize viseme progress bars
     for (int i = 0; i < 4; i++) {
-        visBars[i].x = 100;
-        visBars[i].y = 230 + i * 25;
-        visBars[i].w = 120;
-        visBars[i].h = 14;
+        visBars[i].x = 120;
+        visBars[i].y = 210 + i * 32;
+        visBars[i].w = 440;
+        visBars[i].h = 18;
         visBars[i].value = 0;
     }
 
     // Viseme training buttons
     const char* btnNames[] = { "None", "Silence", "CH", "OU", "AA" };
     for (int i = 0; i < 5; i++) {
-        visButtons[i].x = 20 + i * 70;
-        visButtons[i].y = 330;
-        visButtons[i].w = 60;
+        visButtons[i].x = 20 + i * 90;
+        visButtons[i].y = 350;
+        visButtons[i].w = 80;
         visButtons[i].h = 28;
         visButtons[i].text = btnNames[i];
         visButtons[i].hovered = 0;
     }
 
-    // Hotkey buttons
+    // Hotkey buttons (3x3 grid)
     for (int i = 0; i < MAX_HOTKEYS; i++) {
-        hotkeyBtns[i].x = 70 + (i % 5) * 85;
-        hotkeyBtns[i].y = 420 + (i / 5) * 40;
-        hotkeyBtns[i].w = 60;
-        hotkeyBtns[i].h = 28;
+        hotkeyBtns[i].x = 100 + (i % 3) * 170;
+        hotkeyBtns[i].y = 450 + (i / 3) * 55;
+        hotkeyBtns[i].w = 80;
+        hotkeyBtns[i].h = 32;
         hotkeyBtns[i].keyCode = g_config.hotkeys[i];
         hotkeyBtns[i].waitingForKey = 0;
         hotkeyBtns[i].hovered = 0;
@@ -103,6 +115,8 @@ void settings_close(void) {
         settings = NULL;
     }
     waitingForKeyIdx = -1;
+    currentTrainingSlot = -1;
+    VisemeSetTraining(-1);
 }
 
 void settings_handle_event(RGFW_event* event) {
@@ -119,9 +133,9 @@ void settings_handle_event(RGFW_event* event) {
     if (event->type == RGFW_mousePosChanged) {
         // Update hover states
         btnBrowse.hovered = isPointInRect((float)mx, (float)my, btnBrowse.x, btnBrowse.y, btnBrowse.w, btnBrowse.h);
+        btnTheme.hovered = isPointInRect((float)mx, (float)my, btnTheme.x, btnTheme.y, btnTheme.w, btnTheme.h);
         btnSaveViseme.hovered = isPointInRect((float)mx, (float)my, btnSaveViseme.x, btnSaveViseme.y, btnSaveViseme.w, btnSaveViseme.h);
-        btnCloseSettings.hovered = isPointInRect((float)mx, (float)my, btnCloseSettings.x, btnCloseSettings.y, btnCloseSettings.w, btnCloseSettings.h);
-
+        
         for (int i = 0; i < 5; i++) {
             visButtons[i].hovered = isPointInRect((float)mx, (float)my, visButtons[i].x, visButtons[i].y, visButtons[i].w, visButtons[i].h);
         }
@@ -141,9 +155,12 @@ void settings_handle_event(RGFW_event* event) {
     }
 
     if (event->type == RGFW_mouseButtonPressed && event->button.value == RGFW_mouseLeft) {
-        // Close button
-        if (btnCloseSettings.hovered) {
-            settings_close();
+        // Theme button
+        if (btnTheme.hovered) {
+            g_config.theme = (g_config.theme + 1) % 3;
+            SetTheme(g_config.theme);
+            UpdateThemeButtonText();
+            SaveConfig(g_configPath, &g_config);
             return;
         }
 
@@ -228,42 +245,35 @@ void settings_draw(void) {
 
     RGFW_window_makeCurrentContext_OpenGL(settings);
     glViewport(0, 0, settings->w, settings->h);
-    glClearColor(0.15f, 0.15f, 0.17f, 1.0f);
+    glClearColor(ui_clear_color[0], ui_clear_color[1], ui_clear_color[2], ui_clear_color[3]);
     glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
     nvgBeginFrame(vg_settings, (float)settings->w, (float)settings->h, 1.0f);
 
-    // Title
-    nvgFillColor(vg_settings, UI_TEXT_COLOR);
-    nvgFontSize(vg_settings, 24.0f);
-    nvgFontFace(vg_settings, "sans");
-    nvgTextAlign(vg_settings, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-    nvgText(vg_settings, 20, 15, "Settings", NULL);
-
-    // Close button
-    drawButton(vg_settings, &btnCloseSettings);
+    // Theme button
+    drawButton(vg_settings, &btnTheme);
 
     // Voice Threshold Section
     char volText[64];
     sprintf(volText, "Voice Threshold: %.2f", g_config.voiceThreshold);
-    drawLabel(vg_settings, volText, 20, 55);
+    drawLabel(vg_settings, volText, 20, 40);
     drawSlider(vg_settings, &sliderVolume);
 
     // Model Path Section
-    drawLabel(vg_settings, "Default Model:", 20, 120);
+    drawLabel(vg_settings, "Default Model:", 20, 105);
     strncpy(txtModelPath.text, g_config.defaultModelPath, 511);
     drawTextDisplay(vg_settings, &txtModelPath);
     drawButton(vg_settings, &btnBrowse);
 
     // Viseme Training Section
-    drawLabel(vg_settings, "Viseme Training:", 20, 200);
+    drawLabel(vg_settings, "Viseme Training:", 20, 185);
 
     const char* visNames[] = { "Silence", "CH", "OU", "AA" };
     float* confidences = VisemeGetConfidences();
     int visSlots[] = { VIS_SLOT_SILENCE, VIS_SLOT_CH, VIS_SLOT_OU, VIS_SLOT_AA };
 
     for (int i = 0; i < 4; i++) {
-        drawLabel(vg_settings, visNames[i], 20, visBars[i].y + 12);
+        drawLabel(vg_settings, visNames[i], 20, visBars[i].y + 16);
         visBars[i].value = confidences[visSlots[i]];
         if (visBars[i].value < 0) visBars[i].value = 0;
         if (visBars[i].value > 1) visBars[i].value = 1;
@@ -279,11 +289,11 @@ void settings_draw(void) {
     drawSmallButton(vg_settings, &btnSaveViseme, 0);
 
     // Costume Hotkeys Section
-    drawLabel(vg_settings, "Costume Hotkeys:", 20, 390);
+    drawLabel(vg_settings, "Costume Hotkeys:", 20, 430);
     for (int i = 0; i < MAX_HOTKEYS; i++) {
         char label[8];
         sprintf(label, "C%d:", i + 1);
-        drawLabel(vg_settings, label, hotkeyBtns[i].x - 40, hotkeyBtns[i].y + 18);
+        drawLabel(vg_settings, label, hotkeyBtns[i].x - 45, hotkeyBtns[i].y + 22);
         hotkeyBtns[i].keyCode = g_config.hotkeys[i];
         drawHotkeyButton(vg_settings, &hotkeyBtns[i]);
     }

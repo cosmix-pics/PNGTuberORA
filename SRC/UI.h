@@ -1,22 +1,79 @@
 #ifndef UI_H
 #define UI_H
 
-// Trans Flag Colors
-#define TRANS_BLUE      nvgRGBA(91, 206, 250, 255)
-#define TRANS_PINK      nvgRGBA(245, 169, 184, 255)
-#define TRANS_WHITE     nvgRGBA(255, 255, 255, 255)
+// UI Color Globals
+static NVGcolor ui_bg_color;
+static NVGcolor ui_button_normal;
+static NVGcolor ui_button_hover;
+static NVGcolor ui_button_active;
+static NVGcolor ui_button_border;
+static NVGcolor ui_text_color;
+static NVGcolor ui_text_inv_color; // For buttons with light bg
+static NVGcolor ui_slider_track;
+static NVGcolor ui_slider_knob;
+static NVGcolor ui_progress_bg;
+static NVGcolor ui_progress_fill;
+static NVGcolor ui_textbox_bg;
+static float ui_clear_color[4]; // RGBA for glClearColor
 
-// UI Element Colors
-#define UI_BUTTON_NORMAL TRANS_PINK
-#define UI_BUTTON_HOVER  TRANS_WHITE
-#define UI_BUTTON_BORDER TRANS_WHITE
-#define UI_TEXT_COLOR    TRANS_WHITE
-#define UI_SLIDER_TRACK  nvgRGBA(80, 80, 80, 255)
-#define UI_SLIDER_KNOB   TRANS_PINK
-#define UI_PROGRESS_BG   nvgRGBA(60, 60, 65, 255)
-#define UI_PROGRESS_FILL nvgRGBA(100, 255, 100, 255)
-#define UI_TEXTBOX_BG    nvgRGBA(60, 60, 65, 255)
-#define UI_BUTTON_ACTIVE TRANS_BLUE
+// Theme definitions
+#define THEME_TRANS 0
+#define THEME_DARK  1
+#define THEME_WHITE 2
+
+static void SetTheme(int theme) {
+    if (theme == THEME_TRANS) {
+        // Trans Theme: Blue Background, Darker Pink Buttons, White Text
+        ui_bg_color       = nvgRGBA(30, 60, 100, 255);
+        ui_button_normal  = nvgRGBA(210, 80, 120, 255);  // Darker Pink
+        ui_button_hover   = nvgRGBA(255, 255, 255, 255); // White
+        ui_button_active  = nvgRGBA(100, 200, 255, 255); // Cyan/Blue
+        ui_button_border  = nvgRGBA(255, 255, 255, 255);
+        ui_text_color     = nvgRGBA(255, 255, 255, 255);
+        ui_text_inv_color = nvgRGBA(255, 255, 255, 255); // White text on buttons
+        ui_slider_track   = nvgRGBA(20, 40, 70, 255);
+        ui_slider_knob    = nvgRGBA(210, 80, 120, 255);  // Darker Pink
+        ui_progress_bg    = nvgRGBA(20, 40, 70, 255);
+        ui_progress_fill  = nvgRGBA(255, 255, 255, 255); // White fill for contrast
+        ui_textbox_bg     = nvgRGBA(20, 40, 70, 255);
+        
+        ui_clear_color[0] = 0.12f; ui_clear_color[1] = 0.24f; ui_clear_color[2] = 0.39f; ui_clear_color[3] = 1.0f;
+    } 
+    else if (theme == THEME_DARK) {
+        // Dark Mode: Grays, Dark Blue accent, Red Viseme Bars
+        ui_bg_color       = nvgRGBA(30, 30, 30, 255);
+        ui_button_normal  = nvgRGBA(60, 60, 60, 255);
+        ui_button_hover   = nvgRGBA(80, 80, 80, 255);
+        ui_button_active  = nvgRGBA(100, 100, 100, 255);
+        ui_button_border  = nvgRGBA(100, 100, 100, 255);
+        ui_text_color     = nvgRGBA(220, 220, 220, 255);
+        ui_text_inv_color = nvgRGBA(220, 220, 220, 255);
+        ui_slider_track   = nvgRGBA(40, 40, 40, 255);
+        ui_slider_knob    = nvgRGBA(150, 150, 150, 255);
+        ui_progress_bg    = nvgRGBA(40, 40, 40, 255);
+        ui_progress_fill  = nvgRGBA(200, 50, 50, 255);   // Red
+        ui_textbox_bg     = nvgRGBA(40, 40, 40, 255);
+        
+        ui_clear_color[0] = 0.12f; ui_clear_color[1] = 0.12f; ui_clear_color[2] = 0.12f; ui_clear_color[3] = 1.0f;
+    }
+    else if (theme == THEME_WHITE) {
+        // White Mode: Light grays, Black text
+        ui_bg_color       = nvgRGBA(240, 240, 240, 255);
+        ui_button_normal  = nvgRGBA(220, 220, 220, 255);
+        ui_button_hover   = nvgRGBA(200, 200, 200, 255);
+        ui_button_active  = nvgRGBA(180, 180, 180, 255);
+        ui_button_border  = nvgRGBA(150, 150, 150, 255);
+        ui_text_color     = nvgRGBA(20, 20, 20, 255);
+        ui_text_inv_color = nvgRGBA(20, 20, 20, 255);
+        ui_slider_track   = nvgRGBA(200, 200, 200, 255);
+        ui_slider_knob    = nvgRGBA(100, 100, 100, 255);
+        ui_progress_bg    = nvgRGBA(200, 200, 200, 255);
+        ui_progress_fill  = nvgRGBA(100, 180, 100, 255);
+        ui_textbox_bg     = nvgRGBA(255, 255, 255, 255);
+        
+        ui_clear_color[0] = 0.94f; ui_clear_color[1] = 0.94f; ui_clear_color[2] = 0.94f; ui_clear_color[3] = 1.0f;
+    }
+}
 
 typedef struct {
     float x, y, w, h;
@@ -56,22 +113,18 @@ void drawButton(NVGcontext* vg, Button* b) {
     nvgBeginPath(vg);
     nvgRoundedRect(vg, b->x, b->y, b->w, b->h, 5.0f);
     if (b->hovered)
-        nvgFillColor(vg, UI_BUTTON_HOVER);
+        nvgFillColor(vg, ui_button_hover);
     else
-        nvgFillColor(vg, UI_BUTTON_NORMAL);
+        nvgFillColor(vg, ui_button_normal);
     nvgFill(vg);
     
     nvgBeginPath(vg);
-    nvgStrokeColor(vg, UI_BUTTON_BORDER);
+    nvgStrokeColor(vg, ui_button_border);
     nvgStrokeWidth(vg, 2.0f);
     nvgRoundedRect(vg, b->x, b->y, b->w, b->h, 5.0f);
     nvgStroke(vg);
 
-    // Text color logic: Black on White/Light Pink, White on Dark Blue
-    // Since Hover is White and Normal is Pink (Light), Black text is safer for contrast?
-    // Pink (245,169,184) is quite light. White text on it might be hard to read.
-    // Let's use Dark Grey/Black for text on buttons.
-    nvgFillColor(vg, nvgRGBA(40, 40, 40, 255)); 
+    nvgFillColor(vg, ui_text_inv_color); 
     nvgFontSize(vg, 24.0f);
     nvgFontFace(vg, "sans");
     nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
@@ -86,7 +139,7 @@ void drawSlider(NVGcontext* vg, Slider* s) {
     // Track
     nvgBeginPath(vg);
     nvgRoundedRect(vg, s->x, cy - 2, s->w, 4, 2);
-    nvgFillColor(vg, UI_SLIDER_TRACK);
+    nvgFillColor(vg, ui_slider_track);
     nvgFill(vg);
 
     // Knob
@@ -97,16 +150,16 @@ void drawSlider(NVGcontext* vg, Slider* s) {
 
     nvgBeginPath(vg);
     nvgCircle(vg, knobX, cy, kr);
-    nvgFillColor(vg, UI_SLIDER_KNOB);
+    nvgFillColor(vg, ui_slider_knob);
     nvgFill(vg);
-    nvgStrokeColor(vg, UI_BUTTON_BORDER);
+    nvgStrokeColor(vg, ui_button_border);
     nvgStrokeWidth(vg, 2.0f);
     nvgStroke(vg);
 }
 
 void drawLabel(NVGcontext* vg, const char* text, float x, float y) {
     if (!vg) return;
-    nvgFillColor(vg, UI_TEXT_COLOR);
+    nvgFillColor(vg, ui_text_color);
     nvgFontSize(vg, 20.0f);
     nvgFontFace(vg, "sans");
     nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
@@ -118,7 +171,7 @@ void drawProgressBar(NVGcontext* vg, ProgressBar* p) {
     // Background
     nvgBeginPath(vg);
     nvgRoundedRect(vg, p->x, p->y, p->w, p->h, 3.0f);
-    nvgFillColor(vg, UI_PROGRESS_BG);
+    nvgFillColor(vg, ui_progress_bg);
     nvgFill(vg);
 
     // Fill
@@ -128,7 +181,7 @@ void drawProgressBar(NVGcontext* vg, ProgressBar* p) {
     if (fillW > 0) {
         nvgBeginPath(vg);
         nvgRoundedRect(vg, p->x, p->y, fillW, p->h, 3.0f);
-        nvgFillColor(vg, UI_PROGRESS_FILL);
+        nvgFillColor(vg, ui_progress_fill);
         nvgFill(vg);
     }
 }
@@ -138,17 +191,28 @@ void drawTextDisplay(NVGcontext* vg, TextDisplay* t) {
     // Background
     nvgBeginPath(vg);
     nvgRoundedRect(vg, t->x, t->y, t->w, t->h, 3.0f);
-    nvgFillColor(vg, UI_TEXTBOX_BG);
+    nvgFillColor(vg, ui_textbox_bg);
     nvgFill(vg);
 
     // Text (clipped to box)
     nvgSave(vg);
     nvgScissor(vg, t->x + 4, t->y, t->w - 8, t->h);
-    nvgFillColor(vg, UI_TEXT_COLOR);
+    nvgFillColor(vg, ui_text_color);
     nvgFontSize(vg, 16.0f);
     nvgFontFace(vg, "sans");
-    nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-    nvgText(vg, t->x + 6, t->y + t->h / 2, t->text, NULL);
+
+    float bounds[4];
+    float textWidth = nvgTextBounds(vg, 0, 0, t->text, NULL, bounds);
+    float boxWidth = t->w - 12;
+
+    if (textWidth > boxWidth) {
+        nvgTextAlign(vg, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
+        nvgText(vg, t->x + t->w - 6, t->y + t->h / 2, t->text, NULL);
+    } else {
+        nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+        nvgText(vg, t->x + 6, t->y + t->h / 2, t->text, NULL);
+    }
+    
     nvgRestore(vg);
 }
 
@@ -173,23 +237,23 @@ void drawHotkeyButton(NVGcontext* vg, HotkeyButton* hk) {
     nvgBeginPath(vg);
     nvgRoundedRect(vg, hk->x, hk->y, hk->w, hk->h, 3.0f);
     if (hk->waitingForKey)
-        nvgFillColor(vg, UI_BUTTON_ACTIVE);
+        nvgFillColor(vg, ui_button_active);
     else if (hk->hovered)
-        nvgFillColor(vg, UI_BUTTON_HOVER);
+        nvgFillColor(vg, ui_button_hover);
     else
-        nvgFillColor(vg, UI_TEXTBOX_BG);
+        nvgFillColor(vg, ui_textbox_bg);
     nvgFill(vg);
 
     // Border
     nvgBeginPath(vg);
-    nvgStrokeColor(vg, UI_BUTTON_BORDER);
+    nvgStrokeColor(vg, ui_button_border);
     nvgStrokeWidth(vg, 1.0f);
     nvgRoundedRect(vg, hk->x, hk->y, hk->w, hk->h, 3.0f);
     nvgStroke(vg);
 
     // Text
     const char* keyText = hk->waitingForKey ? "..." : GetKeyNameForDisplay(hk->keyCode);
-    nvgFillColor(vg, hk->waitingForKey ? nvgRGBA(40, 40, 40, 255) : UI_TEXT_COLOR);
+    nvgFillColor(vg, hk->waitingForKey ? ui_text_inv_color : ui_text_color);
     nvgFontSize(vg, 16.0f);
     nvgFontFace(vg, "sans");
     nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
@@ -201,20 +265,20 @@ void drawSmallButton(NVGcontext* vg, Button* b, int active) {
     nvgBeginPath(vg);
     nvgRoundedRect(vg, b->x, b->y, b->w, b->h, 3.0f);
     if (active)
-        nvgFillColor(vg, UI_BUTTON_ACTIVE);
+        nvgFillColor(vg, ui_button_active);
     else if (b->hovered)
-        nvgFillColor(vg, UI_BUTTON_HOVER);
+        nvgFillColor(vg, ui_button_hover);
     else
-        nvgFillColor(vg, UI_TEXTBOX_BG);
+        nvgFillColor(vg, ui_textbox_bg);
     nvgFill(vg);
 
     nvgBeginPath(vg);
-    nvgStrokeColor(vg, UI_BUTTON_BORDER);
+    nvgStrokeColor(vg, ui_button_border);
     nvgStrokeWidth(vg, 1.0f);
     nvgRoundedRect(vg, b->x, b->y, b->w, b->h, 3.0f);
     nvgStroke(vg);
 
-    nvgFillColor(vg, (active || b->hovered) ? nvgRGBA(40, 40, 40, 255) : UI_TEXT_COLOR);
+    nvgFillColor(vg, (active || b->hovered) ? ui_text_inv_color : ui_text_color);
     nvgFontSize(vg, 14.0f);
     nvgFontFace(vg, "sans");
     nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
