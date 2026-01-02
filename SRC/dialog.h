@@ -14,7 +14,12 @@
 #else
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/param.h>
 #define PATH_SEP "/"
+#endif
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
 #endif
 
 // Dialog window dimensions
@@ -156,7 +161,7 @@ void dialog_init(void) {
         g_dialogPath[sizeof(g_dialogPath) - 1] = '\0';
     }
 #else
-    char absPath[512];
+    char absPath[PATH_MAX];
     if (realpath(g_dialogPath, absPath) != NULL) {
         strncpy(g_dialogPath, absPath, sizeof(g_dialogPath) - 1);
         g_dialogPath[sizeof(g_dialogPath) - 1] = '\0';

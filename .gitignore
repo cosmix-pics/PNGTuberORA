@@ -1,7 +1,12 @@
 # Build output
 build/
 nob
-nob.exe
+*.exe
+
+# Linux binaries
+*.a
+*.out
+*.old
 
 # MSVC artifacts
 *.obj
