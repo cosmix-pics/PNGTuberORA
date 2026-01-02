@@ -14,8 +14,12 @@
 #else
 #include <dirent.h>
 #include <sys/stat.h>
-#include <linux/limits.h>
+#include <sys/param.h>
 #define PATH_SEP "/"
+#endif
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
 #endif
 
 // Dialog window dimensions
