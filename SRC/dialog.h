@@ -14,6 +14,7 @@
 #else
 #include <dirent.h>
 #include <sys/stat.h>
+#include <linux/limits.h>
 #define PATH_SEP "/"
 #endif
 
@@ -156,7 +157,7 @@ void dialog_init(void) {
         g_dialogPath[sizeof(g_dialogPath) - 1] = '\0';
     }
 #else
-    char absPath[512];
+    char absPath[PATH_MAX];
     if (realpath(g_dialogPath, absPath) != NULL) {
         strncpy(g_dialogPath, absPath, sizeof(g_dialogPath) - 1);
         g_dialogPath[sizeof(g_dialogPath) - 1] = '\0';

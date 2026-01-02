@@ -82,7 +82,7 @@ int menu_handle_event(RGFW_event* event) {
 
     if (event->type == RGFW_mouseButtonPressed && event->button.value == RGFW_mouseLeft) {
         if (btnMenuSettings.hovered) {
-            menu_hide();=
+            menu_hide();
             settings_close();
             dialog_close();
             settings_init();
